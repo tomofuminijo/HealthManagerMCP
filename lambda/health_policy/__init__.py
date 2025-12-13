@@ -1,0 +1,1 @@
+# HealthPolicyLambda関数

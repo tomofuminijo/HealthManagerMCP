@@ -1,0 +1,203 @@
+[
+  {
+    "name": "AddActivities",
+    "description": "指定した日に新しい活動を追加する（既存の活動は保持される）。1つまたは複数の活動を追加可能。例：「今日は7時に起床、8時に朝食を記録」「12時に昼食を追加」など。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationType": {
+          "type": "string",
+          "description": "操作タイプ。このツールでは常に'append'を指定してください"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "date": {
+          "type": "string",
+          "description": "日付（YYYY-MM-DD）"
+        },
+        "activities": {
+          "type": "array",
+          "description": "追加する活動のリスト（1つ以上）",
+          "items": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "string",
+                "description": "時刻（HH:MM）"
+              },
+              "activityType": {
+                "type": "string",
+                "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|weight|bodyFat|mood|medication|bowelMovement|urination|symptoms|other）"
+              },
+              "description": {
+                "type": "string",
+                "description": "活動の説明"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "活動の詳細項目"
+              }
+            },
+            "required": ["time", "activityType", "description"]
+          }
+        }
+      },
+      "required": ["operationType", "userId", "date", "activities"]
+    }
+  },
+  {
+    "name": "UpdateActivity",
+    "description": "指定した日の特定の時刻の活動だけを部分的に更新する。他の時刻の活動は変更されない。例：「8時の朝食を8時30分に変更」「12時の昼食の内容を修正」など、1つの活動のみを修正する場合に使用。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "date": {
+          "type": "string",
+          "description": "日付（YYYY-MM-DD）"
+        },
+        "time": {
+          "type": "string",
+          "description": "更新対象の時刻（HH:MM）"
+        },
+        "activityType": {
+          "type": "string",
+          "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|weight|bodyFat|mood|medication|bowelMovement|urination|symptoms|other）"
+        },
+        "description": {
+          "type": "string",
+          "description": "活動の説明"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "活動の詳細項目"
+        }
+      },
+      "required": ["userId", "date", "time"]
+    }
+  },
+  {
+    "name": "UpdateActivities",
+    "description": "指定した日の全ての活動を完全に置き換える。既存の活動は全て削除され、新しいリストで上書きされる。例：「今日の記録を全部やり直したい」「複数の活動をまとめて修正」など、大幅な変更が必要な場合のみ使用。単一の活動の修正にはUpdateActivityを使用すること。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationType": {
+          "type": "string",
+          "description": "操作タイプ。このツールでは常に'replace'を指定してください"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "date": {
+          "type": "string",
+          "description": "日付（YYYY-MM-DD）"
+        },
+        "activities": {
+          "type": "array",
+          "description": "新しい活動のリスト（既存の活動は全て置き換えられます）",
+          "items": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "string",
+                "description": "時刻（HH:MM）"
+              },
+              "activityType": {
+                "type": "string",
+                "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|weight|bodyFat|mood|medication|bowelMovement|urination|symptoms|other）"
+              },
+              "description": {
+                "type": "string",
+                "description": "活動の説明"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "活動の詳細項目"
+              }
+            },
+            "required": ["time", "activityType", "description"]
+          }
+        }
+      },
+      "required": ["operationType", "userId", "date", "activities"]
+    }
+  },
+  {
+    "name": "DeleteActivity",
+    "description": "指定した日の特定の時刻の活動を削除する。他の時刻の活動は保持される。例：「8時の朝食を削除」「12時の記録を消して」など。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "date": {
+          "type": "string",
+          "description": "日付（YYYY-MM-DD）"
+        },
+        "time": {
+          "type": "string",
+          "description": "時刻（HH:MM）"
+        }
+      },
+      "required": ["userId", "date", "time"]
+    }
+  },
+  {
+    "name": "GetActivities",
+    "description": "指定した日のユーザーの行動を取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "date": {
+          "type": "string",
+          "description": "日付（YYYY-MM-DD）"
+        }
+      },
+      "required": ["userId", "date"]
+    }
+  },
+  {
+    "name": "GetActivitiesInRange",
+    "description": "指定した期間のユーザーの行動履歴を取得する（最大365日間）",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "開始日（YYYY-MM-DD）"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "終了日（YYYY-MM-DD）"
+        }
+      },
+      "required": ["userId", "startDate", "endDate"]
+    }
+  }
+]

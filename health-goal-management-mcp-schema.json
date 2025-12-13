@@ -1,0 +1,114 @@
+[
+  {
+    "name": "addGoal",
+    "description": "新しい健康目標を追加する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "goalType": {
+          "type": "string",
+          "description": "目標タイプ（longevity: 長寿・健康寿命、fitness: フィットネス・体型、weight: 体重管理、mental_health: メンタルヘルス、other: その他）"
+        },
+        "title": {
+          "type": "string",
+          "description": "目標のタイトル（例: 100歳まで健康寿命、アスリート体型）"
+        },
+        "description": {
+          "type": "string",
+          "description": "目標の詳細説明"
+        },
+        "targetValue": {
+          "type": "string",
+          "description": "目標値（例: 60kg、体脂肪率15%）"
+        },
+        "targetDate": {
+          "type": "string",
+          "description": "目標達成日（YYYY-MM-DD形式）"
+        },
+        "priority": {
+          "type": "integer",
+          "description": "優先度（1-5、デフォルト: 3）"
+        }
+      },
+      "required": ["userId", "goalType", "title"]
+    }
+  },
+  {
+    "name": "updateGoal",
+    "description": "既存の健康目標を更新する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "goalId": {
+          "type": "string",
+          "description": "目標ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "目標のタイトル"
+        },
+        "description": {
+          "type": "string",
+          "description": "目標の詳細説明"
+        },
+        "targetValue": {
+          "type": "string",
+          "description": "目標値"
+        },
+        "targetDate": {
+          "type": "string",
+          "description": "目標達成日（YYYY-MM-DD形式）"
+        },
+        "priority": {
+          "type": "integer",
+          "description": "優先度（1-5）"
+        },
+        "status": {
+          "type": "string",
+          "description": "ステータス（active: アクティブ、achieved: 達成、paused: 一時停止、cancelled: キャンセル）"
+        }
+      },
+      "required": ["userId", "goalId"]
+    }
+  },
+  {
+    "name": "deleteGoal",
+    "description": "指定した健康目標を削除する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "goalId": {
+          "type": "string",
+          "description": "目標ID"
+        }
+      },
+      "required": ["userId", "goalId"]
+    }
+  },
+  {
+    "name": "getGoals",
+    "description": "ユーザーのすべての健康目標を取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        }
+      },
+      "required": ["userId"]
+    }
+  }
+]

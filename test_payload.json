@@ -1,0 +1,8 @@
+{
+  "policyType": "diet",
+  "description": "Low-carb diet policy",
+  "parameters": {
+    "carb": "low"
+  },
+  "userId": "johnny"
+}

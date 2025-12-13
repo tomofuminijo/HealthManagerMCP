@@ -1,0 +1,86 @@
+[
+  {
+    "name": "AddPolicy",
+    "description": "新しい健康ポリシーを追加する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "policyType": {
+          "type": "string",
+          "description": "ポリシータイプ（diet|exercise|sleep|fasting|other）"
+        },
+        "description": {
+          "type": "string",
+          "description": "ポリシーの説明"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "ポリシー固有のパラメータ"
+        }
+      },
+      "required": ["userId", "policyType", "description"]
+    }
+  },
+  {
+    "name": "UpdatePolicy",
+    "description": "既存の健康ポリシーを更新する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "policyId": {
+          "type": "string",
+          "description": "ポリシーID"
+        },
+        "description": {
+          "type": "string",
+          "description": "ポリシーの説明"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "ポリシー固有のパラメータ"
+        }
+      },
+      "required": ["userId", "policyId"]
+    }
+  },
+  {
+    "name": "DeletePolicy",
+    "description": "指定した健康ポリシーを削除する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "policyId": {
+          "type": "string",
+          "description": "ポリシーID"
+        }
+      },
+      "required": ["userId", "policyId"]
+    }
+  },
+  {
+    "name": "GetPolicy",
+    "description": "ユーザーのすべての健康ポリシーを取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        }
+      },
+      "required": ["userId"]
+    }
+  }
+]

@@ -1,0 +1,78 @@
+[
+  {
+    "name": "AddUser",
+    "description": "新しいユーザー情報を作成する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "username": {
+          "type": "string",
+          "description": "ユーザー名"
+        },
+        "email": {
+          "type": "string",
+          "description": "メールアドレス"
+        },
+        "goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "ユーザーの目標（複数可）。例：「直近1年で10kgダイエット」「100歳まで健康寿命」"
+        }
+      },
+      "required": ["userId", "username"]
+    }
+  },
+  {
+    "name": "UpdateUser",
+    "description": "ユーザー情報を更新する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "username": {
+          "type": "string",
+          "description": "ユーザー名"
+        },
+        "email": {
+          "type": "string",
+          "description": "メールアドレス"
+        },
+        "goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "ユーザーの目標（複数可）。例：「直近1年で10kgダイエット」「100歳まで健康寿命」"
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "description": "最終ログイン日時"
+        }
+      },
+      "required": ["userId"]
+    }
+  },
+  {
+    "name": "GetUser",
+    "description": "ユーザー情報を取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        }
+      },
+      "required": ["userId"]
+    }
+  }
+]
