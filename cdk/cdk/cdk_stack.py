@@ -3,6 +3,7 @@ from aws_cdk import (
     RemovalPolicy,
     Duration,
     CfnResource,
+    CfnOutput,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_iam as iam,
@@ -248,6 +249,8 @@ class HealthManagerMCPStack(Stack):
             ),
         )
 
+
+
         # ========================================
         # Lambda関数
         # ========================================
@@ -444,93 +447,9 @@ class HealthManagerMCPStack(Stack):
             },
         )
         
-        # Gateway Targetの作成（UserManagement）
-        # NOTE: GatewayTargetはCDKでの作成が不安定なため、CLIで手動作成する
-        # 手順は AGENTCORE_GATEWAY_SETUP.md を参照
-        # self.user_gateway_target = CfnResource(
-        #     self,
-        #     "UserManagementGatewayTarget",
-        #     type="AWS::BedrockAgentCore::GatewayTarget",
-        #     properties={
-        #         "Name": "UserManagement",
-        #         "Description": "ユーザー情報を管理する",
-        #         "GatewayIdentifier": self.agentcore_gateway.ref,
-        #         "CredentialProviderConfigurations": [
-        #             {
-        #                 "CredentialProviderType": "GATEWAY_IAM_ROLE"
-        #             }
-        #         ],
-        #         "TargetConfiguration": {
-        #             "Mcp": {
-        #                 "Lambda": {
-        #                     "LambdaArn": self.user_lambda.function_arn,
-        #                     "ToolSchema": {
-        #                         "InlinePayload": json.dumps(user_mcp_schema)
-        #                     }
-        #                 }
-        #             }
-        #         },
-        #     },
-        # )
-        
-        # Gateway Targetの作成（HealthPolicyManagement）
-        # self.health_policy_gateway_target = CfnResource(
-        #     self,
-        #     "HealthPolicyManagementGatewayTarget",
-        #     type="AWS::BedrockAgentCore::GatewayTarget",
-        #     properties={
-        #         "Name": "HealthPolicyManagement",
-        #         "Description": "ユーザーの健康ポリシーを管理する",
-        #         "GatewayIdentifier": self.agentcore_gateway.ref,
-        #         "CredentialProviderConfigurations": [
-        #             {
-        #                 "CredentialProviderType": "GATEWAY_IAM_ROLE"
-        #             }
-        #         ],
-        #         "TargetConfiguration": {
-        #             "Mcp": {
-        #                 "Lambda": {
-        #                     "LambdaArn": self.health_policy_lambda.function_arn,
-        #                     "ToolSchema": {
-        #                         "InlinePayload": json.dumps(health_policy_mcp_schema)
-        #                     }
-        #                 }
-        #             }
-        #         },
-        #     },
-        # )
-
-        # Gateway Targetの作成（ActivityManagement）
-        # self.activity_gateway_target = CfnResource(
-        #     self,
-        #     "ActivityManagementGatewayTarget",
-        #     type="AWS::BedrockAgentCore::GatewayTarget",
-        #     properties={
-        #         "Name": "ActivityManagement",
-        #         "Description": "ユーザーの日々の健康活動を記録・取得する",
-        #         "GatewayIdentifier": self.agentcore_gateway.ref,
-        #         "CredentialProviderConfigurations": [
-        #             {
-        #                 "CredentialProviderType": "GATEWAY_IAM_ROLE"
-        #             }
-        #         ],
-        #         "TargetConfiguration": {
-        #             "Mcp": {
-        #                 "Lambda": {
-        #                     "LambdaArn": self.activity_lambda.function_arn,
-        #                     "ToolSchema": {
-        #                         "InlinePayload": json.dumps(activity_mcp_schema)
-        #                     }
-        #                 }
-        #             }
-        #         },
-        #     },
-        # )
-        
-        # Gateway TargetがGatewayに依存することを明示
-        # self.user_gateway_target.add_dependency(self.agentcore_gateway)
-        # self.health_policy_gateway_target.add_dependency(self.agentcore_gateway)
-        # self.activity_gateway_target.add_dependency(self.agentcore_gateway)
+        # Gateway Targetの作成
+        # NOTE: Gateway TargetはCloudFormationでの作成が複雑なため、
+        # CDKデプロイ後にcreate-gateway-targets.shスクリプトで作成する
 
         # ========================================
         # Lambda Permissions
@@ -559,4 +478,232 @@ class HealthManagerMCPStack(Stack):
             "AllowAgentCoreGatewayInvoke",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
             action="lambda:InvokeFunction",
+        )
+
+
+
+        # ========================================
+        # CloudFormation Outputs
+        # ========================================
+
+        # 高優先度（必須）
+        CfnOutput(
+            self,
+            "UserPoolId",
+            value=self.user_pool.user_pool_id,
+            description="Cognito User Pool ID",
+            export_name="HealthManagerMCP-UserPoolId"
+        )
+
+        CfnOutput(
+            self,
+            "UserPoolClientId", 
+            value=self.user_pool_client.user_pool_client_id,
+            description="Cognito User Pool Client ID",
+            export_name="HealthManagerMCP-UserPoolClientId"
+        )
+
+        CfnOutput(
+            self,
+            "AuthorizationUrl",
+            value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/authorize",
+            description="OAuth 2.0 Authorization URL",
+            export_name="HealthManagerMCP-AuthorizationUrl"
+        )
+
+        CfnOutput(
+            self,
+            "TokenUrl",
+            value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
+            description="OAuth 2.0 Token URL", 
+            export_name="HealthManagerMCP-TokenUrl"
+        )
+
+        # Gateway Endpointは動的に決まるため、デプロイ後に手動で設定が必要
+        # 一旦プレースホルダーとして出力
+        CfnOutput(
+            self,
+            "GatewayEndpointPlaceholder",
+            value="https://GATEWAY_ID.agentcore.us-west-2.amazonaws.com",
+            description="AgentCore Gateway Endpoint (Update after deployment)",
+            export_name="HealthManagerMCP-GatewayEndpoint"
+        )
+
+        CfnOutput(
+            self,
+            "Region",
+            value=self.region,
+            description="AWS Region",
+            export_name="HealthManagerMCP-Region"
+        )
+
+        CfnOutput(
+            self,
+            "AccountId",
+            value=self.account,
+            description="AWS Account ID",
+            export_name="HealthManagerMCP-AccountId"
+        )
+
+        # 中優先度（推奨）
+
+        CfnOutput(
+            self,
+            "GatewayName",
+            value="healthmate-gateway",
+            description="AgentCore Gateway Name",
+            export_name="HealthManagerMCP-GatewayName"
+        )
+
+        # Lambda関数ARN
+        CfnOutput(
+            self,
+            "UserLambdaArn",
+            value=self.user_lambda.function_arn,
+            description="User Lambda Function ARN",
+            export_name="HealthManagerMCP-UserLambdaArn"
+        )
+
+        CfnOutput(
+            self,
+            "HealthGoalLambdaArn",
+            value=self.health_goal_lambda.function_arn,
+            description="Health Goal Lambda Function ARN",
+            export_name="HealthManagerMCP-HealthGoalLambdaArn"
+        )
+
+        CfnOutput(
+            self,
+            "HealthPolicyLambdaArn",
+            value=self.health_policy_lambda.function_arn,
+            description="Health Policy Lambda Function ARN",
+            export_name="HealthManagerMCP-HealthPolicyLambdaArn"
+        )
+
+        CfnOutput(
+            self,
+            "ActivityLambdaArn",
+            value=self.activity_lambda.function_arn,
+            description="Activity Lambda Function ARN",
+            export_name="HealthManagerMCP-ActivityLambdaArn"
+        )
+
+        # DynamoDBテーブル名
+        CfnOutput(
+            self,
+            "UsersTableName",
+            value=self.users_table.table_name,
+            description="Users DynamoDB Table Name",
+            export_name="HealthManagerMCP-UsersTableName"
+        )
+
+        CfnOutput(
+            self,
+            "GoalsTableName",
+            value=self.goals_table.table_name,
+            description="Goals DynamoDB Table Name",
+            export_name="HealthManagerMCP-GoalsTableName"
+        )
+
+        CfnOutput(
+            self,
+            "PoliciesTableName",
+            value=self.policies_table.table_name,
+            description="Policies DynamoDB Table Name",
+            export_name="HealthManagerMCP-PoliciesTableName"
+        )
+
+        CfnOutput(
+            self,
+            "ActivitiesTableName",
+            value=self.activities_table.table_name,
+            description="Activities DynamoDB Table Name",
+            export_name="HealthManagerMCP-ActivitiesTableName"
+        )
+
+        # DynamoDBテーブルARN
+        CfnOutput(
+            self,
+            "UsersTableArn",
+            value=self.users_table.table_arn,
+            description="Users DynamoDB Table ARN",
+            export_name="HealthManagerMCP-UsersTableArn"
+        )
+
+        CfnOutput(
+            self,
+            "GoalsTableArn",
+            value=self.goals_table.table_arn,
+            description="Goals DynamoDB Table ARN",
+            export_name="HealthManagerMCP-GoalsTableArn"
+        )
+
+        CfnOutput(
+            self,
+            "PoliciesTableArn",
+            value=self.policies_table.table_arn,
+            description="Policies DynamoDB Table ARN",
+            export_name="HealthManagerMCP-PoliciesTableArn"
+        )
+
+        CfnOutput(
+            self,
+            "ActivitiesTableArn",
+            value=self.activities_table.table_arn,
+            description="Activities DynamoDB Table ARN",
+            export_name="HealthManagerMCP-ActivitiesTableArn"
+        )
+
+        # 低優先度（便利）
+        CfnOutput(
+            self,
+            "JwksUrl",
+            value=f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool.user_pool_id}/.well-known/jwks.json",
+            description="JWKS URL for JWT token verification",
+            export_name="HealthManagerMCP-JwksUrl"
+        )
+
+        CfnOutput(
+            self,
+            "DiscoveryUrl",
+            value=discovery_url,
+            description="OIDC Discovery URL",
+            export_name="HealthManagerMCP-DiscoveryUrl"
+        )
+
+        CfnOutput(
+            self,
+            "UserInfoUrl",
+            value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/userInfo",
+            description="OAuth 2.0 UserInfo URL",
+            export_name="HealthManagerMCP-UserInfoUrl"
+        )
+
+        # MCP接続設定（JSON形式）
+        mcp_connection_config = {
+            "gatewayEndpoint": "https://GATEWAY_ID.agentcore.us-west-2.amazonaws.com",  # デプロイ後に更新が必要
+            "authConfig": {
+                "type": "oauth2",
+                "authorizationUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/authorize",
+                "tokenUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
+                "userInfoUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/userInfo",
+                "clientId": self.user_pool_client.user_pool_client_id,
+                "scopes": ["openid", "profile", "email", "phone"]
+            },
+            "tools": {
+                "userManagement": "UserManagement",
+                "healthGoalManagement": "HealthGoalManagement",
+                "healthPolicyManagement": "HealthPolicyManagement", 
+                "activityManagement": "ActivityManagement"
+            },
+            "region": self.region,
+            "accountId": self.account
+        }
+
+        CfnOutput(
+            self,
+            "MCPConnectionConfig",
+            value=json.dumps(mcp_connection_config, indent=2),
+            description="Complete MCP connection configuration (JSON)",
+            export_name="HealthManagerMCP-MCPConnectionConfig"
         )
