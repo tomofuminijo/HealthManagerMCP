@@ -519,13 +519,11 @@ class HealthManagerMCPStack(Stack):
             export_name="HealthManagerMCP-TokenUrl"
         )
 
-        # Gateway Endpointは動的に決まるため、デプロイ後に手動で設定が必要
-        # 一旦プレースホルダーとして出力
         CfnOutput(
             self,
-            "GatewayEndpointPlaceholder",
-            value="https://GATEWAY_ID.agentcore.us-west-2.amazonaws.com",
-            description="AgentCore Gateway Endpoint (Update after deployment)",
+            "GatewayEndpoint",
+            value=f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
+            description="AgentCore Gateway Endpoint",
             export_name="HealthManagerMCP-GatewayEndpoint"
         )
 
@@ -553,6 +551,14 @@ class HealthManagerMCPStack(Stack):
             value="healthmate-gateway",
             description="AgentCore Gateway Name",
             export_name="HealthManagerMCP-GatewayName"
+        )
+
+        CfnOutput(
+            self,
+            "GatewayId",
+            value=self.agentcore_gateway.ref,
+            description="AgentCore Gateway ID",
+            export_name="HealthManagerMCP-GatewayId"
         )
 
         # Lambda関数ARN
@@ -681,7 +687,7 @@ class HealthManagerMCPStack(Stack):
 
         # MCP接続設定（JSON形式）
         mcp_connection_config = {
-            "gatewayEndpoint": "https://GATEWAY_ID.agentcore.us-west-2.amazonaws.com",  # デプロイ後に更新が必要
+            "gatewayEndpoint": f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
             "authConfig": {
                 "type": "oauth2",
                 "authorizationUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/authorize",
