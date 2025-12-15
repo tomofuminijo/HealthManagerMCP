@@ -28,10 +28,13 @@ import sys
 
 # AWS設定
 AWS_REGION = "us-west-2"
-USER_POOL_ID = "us-west-2_H5DVWxi8O"
-CLIENT_ID = "75skorj1n3i072ope5vut43h92"
-CLIENT_SECRET = "leigshkt8tb5rj07sibj5gf74u9f96prvnsf7j4nspo6v95ov7p"
-COGNITO_DOMAIN = "healthmate.auth.us-west-2.amazoncognito.com"
+STACK_NAME = "HealthManagerMCPStack"
+
+# 動的に取得される設定値（CloudFormation Outputsから）
+USER_POOL_ID = None
+CLIENT_ID = None
+CLIENT_SECRET = None
+COGNITO_DOMAIN = None
 
 # テストユーザー情報
 TEST_USERNAME = f"testuser_{uuid.uuid4().hex[:8]}"
@@ -43,9 +46,83 @@ class HealthManagerMCPTestClient:
     
     def __init__(self):
         self.cognito_client = boto3.client('cognito-idp', region_name=AWS_REGION)
+        self.cloudformation_client = boto3.client('cloudformation', region_name=AWS_REGION)
         self.access_token = None
         self.user_id = None
         self.gateway_endpoint = None
+        
+        # CloudFormation Outputsから設定を取得
+        self._load_config_from_cloudformation()
+    
+    def _load_config_from_cloudformation(self) -> None:
+        """CloudFormation StackのOutputsから設定を動的に取得"""
+        global USER_POOL_ID, CLIENT_ID, CLIENT_SECRET, COGNITO_DOMAIN
+        
+        try:
+            print(f"🔧 CloudFormation Stack '{STACK_NAME}' から設定を取得中...")
+            
+            # CloudFormation Outputsを取得
+            response = self.cloudformation_client.describe_stacks(StackName=STACK_NAME)
+            stack = response['Stacks'][0]
+            outputs = {output['OutputKey']: output['OutputValue'] for output in stack.get('Outputs', [])}
+            
+            # 必要な設定値を取得
+            USER_POOL_ID = outputs.get('UserPoolId')
+            CLIENT_ID = outputs.get('UserPoolClientId')
+            
+            # CognitoDomainをAuthorizationUrlから抽出
+            auth_url = outputs.get('AuthorizationUrl', '')
+            if auth_url:
+                # https://healthmate.auth.us-west-2.amazoncognito.com/oauth2/authorize から
+                # healthmate.auth.us-west-2.amazoncognito.com を抽出
+                import urllib.parse
+                parsed_url = urllib.parse.urlparse(auth_url)
+                COGNITO_DOMAIN = parsed_url.netloc
+            else:
+                COGNITO_DOMAIN = None
+            
+            if not all([USER_POOL_ID, CLIENT_ID, COGNITO_DOMAIN]):
+                missing = []
+                if not USER_POOL_ID: missing.append('UserPoolId')
+                if not CLIENT_ID: missing.append('UserPoolClientId')
+                if not COGNITO_DOMAIN: missing.append('CognitoDomain (from AuthorizationUrl)')
+                raise ValueError(f"必要なCloudFormation Outputsが見つかりません: {', '.join(missing)}")
+            
+            print(f"✅ CloudFormation設定取得完了:")
+            print(f"   User Pool ID: {USER_POOL_ID}")
+            print(f"   Client ID: {CLIENT_ID}")
+            print(f"   Cognito Domain: {COGNITO_DOMAIN}")
+            
+            # CLIENT_SECRETをCognito APIから取得
+            self._get_client_secret()
+            
+        except Exception as e:
+            print(f"❌ CloudFormation設定取得失敗: {str(e)}")
+            print("   CloudFormation Stackがデプロイされていることを確認してください")
+            raise
+    
+    def _get_client_secret(self) -> None:
+        """Cognito User Pool ClientのSecretを取得"""
+        global CLIENT_SECRET
+        
+        try:
+            print("🔐 Cognito Client Secretを取得中...")
+            
+            response = self.cognito_client.describe_user_pool_client(
+                UserPoolId=USER_POOL_ID,
+                ClientId=CLIENT_ID
+            )
+            
+            CLIENT_SECRET = response['UserPoolClient'].get('ClientSecret')
+            
+            if CLIENT_SECRET:
+                print(f"✅ Client Secret取得完了: {CLIENT_SECRET[:10]}...")
+            else:
+                raise ValueError("Client Secretが設定されていません")
+                
+        except Exception as e:
+            print(f"❌ Client Secret取得失敗: {str(e)}")
+            raise
         
     def calculate_secret_hash(self, username: str) -> str:
         """Cognito Client Secret Hash を計算"""

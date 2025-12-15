@@ -203,11 +203,13 @@ class HealthManagerMCPStack(Stack):
                     "https://healthcoachai.example.com/oauth/callback",  # HealthCoachAI
                     "https://healthmateui.example.com/oauth/callback",   # HealthmateUI
                     "https://chatgpt.com/connector_platform_oauth_redirect",  # ChatGPT
+                    "http://localhost:8000/auth/callback"
                 ],
                 logout_urls=[
                     "https://healthcoachai.example.com/oauth/logout",
                     "https://healthmateui.example.com/oauth/logout",
-                    "https://chatgpt.com/connector_platform_oauth_redirect"
+                    "https://chatgpt.com/connector_platform_oauth_redirect",
+                    "http://localhost:8000/auth/logout"
                 ],
             ),
             # トークン有効期限
