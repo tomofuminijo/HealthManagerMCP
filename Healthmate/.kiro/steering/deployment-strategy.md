@@ -80,7 +80,7 @@ aws agentcore list-gateway-targets --gateway-name healthmate-gateway --region us
 ```bash
 # HealthManagerMCP サービスのデプロイ完了確認
 # CloudFormation スタック出力の確認
-aws cloudformation describe-stacks --stack-name HealthManagerMCPStack --region us-west-2
+aws cloudformation describe-stacks --stack-name Healthmate-HealthManagerStack --region us-west-2
 ```
 
 #### Deployment Commands
@@ -166,7 +166,7 @@ export ACTIVITIES_TABLE_NAME="healthmate-activities"
 ```bash
 export HEALTHMANAGER_GATEWAY_ID="gateway-id-from-cloudformation"
 export AWS_REGION="us-west-2"
-export HEALTH_STACK_NAME="HealthManagerMCPStack"
+export HEALTH_STACK_NAME="Healthmate-HealthManagerStack"
 ```
 
 #### HealthmateUI サービス

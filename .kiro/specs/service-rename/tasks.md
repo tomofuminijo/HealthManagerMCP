@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [-] 1. Phase 1: Local Service Changes
+- [x] 1. Phase 1: Local Service Changes
   - フォルダ名変更、CDK設定更新、ローカルドキュメント更新
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
@@ -42,7 +42,7 @@
   - Python import文の検証
   - _Requirements: 5.4_
 
-- [ ] 2. Phase 2: Cross-Service Updates
+- [-] 2. Phase 2: Cross-Service Updates
   - 他のサービスの設定更新と環境変数の変更
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
@@ -50,12 +50,12 @@
   - **Property 3: Cross-service reference consistency**
   - **Validates: Requirements 1.5, 3.1, 3.2**
 
-- [ ] 2.2 Update HealthCoachAI service references
+- [x] 2.2 Update HealthCoachAI service references
   - manual_test_agent.py, test_config_helper.py, deploy_to_aws.shの更新
   - 「HealthManagerMCPStack」を「Healthmate-HealthManagerStack」に変更
   - _Requirements: 3.1_
 
-- [ ] 2.3 Update HealthmateUI service references
+- [x] 2.3 Update HealthmateUI service references
   - run_dev.py, test_e2e_healthcoach.pyの更新
   - デフォルトスタック名を新しい名前に変更
   - _Requirements: 3.2_
@@ -64,17 +64,17 @@
   - **Property 4: Environment variable consistency**
   - **Validates: Requirements 3.3**
 
-- [ ] 2.5 Update environment variable defaults
+- [x] 2.5 Update environment variable defaults
   - 全てのHEALTH_STACK_NAMEデフォルト値を更新
   - ドキュメント内の環境変数例を更新
   - _Requirements: 3.3_
 
-- [ ] 2.6 Update deployment and test scripts
+- [x] 2.6 Update deployment and test scripts
   - test_mcp_client.pyのSTACK_NAME変数を更新
   - 各種シェルスクリプト内の参照を更新
   - _Requirements: 3.4, 3.5_
 
-- [ ] 2.7 Run cross-service integration tests
+- [x] 2.7 Run cross-service integration tests
   - HealthCoachAIとHealthmateUIからの接続テスト
   - 設定変更後の動作確認
   - _Requirements: 5.4_

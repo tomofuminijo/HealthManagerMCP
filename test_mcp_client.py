@@ -28,7 +28,7 @@ import sys
 
 # AWS設定
 AWS_REGION = "us-west-2"
-STACK_NAME = "HealthManagerMCPStack"
+STACK_NAME = "Healthmate-HealthManagerStack"
 
 # 動的に取得される設定値（CloudFormation Outputsから）
 USER_POOL_ID = None
