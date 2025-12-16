@@ -210,17 +210,12 @@ class HealthManagerMCPTestClient:
     
     def discover_gateway_endpoint(self) -> bool:
         """AgentCore Gatewayのエンドポイントを発見"""
-        print("🔍 AgentCore Gatewayエンドポイントを検索中...")
+        print("🔍 AgentCore Gatewayエンドポイントを設定中...")
         
-        # 注: 実際のAgentCore Gateway APIが利用可能になるまで、
-        # 仮のエンドポイントを使用
-        # TODO: 実際のAWS CLIまたはSDKでGatewayエンドポイントを取得
+        # 提供されたGateway URLを使用
+        self.gateway_endpoint = "https://healthmate-gateway-qasdnfjel0.gateway.bedrock-agentcore.us-west-2.amazonaws.com"
         
-        # 仮のエンドポイント（実際のデプロイ後に更新が必要）
-        self.gateway_endpoint = "https://healthmate-gateway.bedrock-agentcore.us-west-2.amazonaws.com"
-        
-        print(f"⚠️  仮のエンドポイントを使用: {self.gateway_endpoint}")
-        print("   注: 実際のデプロイ後にエンドポイントを更新してください")
+        print(f"✅ Gateway Endpoint設定完了: {self.gateway_endpoint}")
         return True
     
     def test_mcp_connection(self) -> bool:
@@ -244,398 +239,259 @@ class HealthManagerMCPTestClient:
         }
         
         try:
-            # 注: 実際のAgentCore Gateway APIが利用可能になるまで、
-            # この部分はモックレスポンスを返す
-            print("⚠️  実際のMCP接続は、AgentCore Gateway APIが利用可能になってから実装されます")
-            print("   現在はモックレスポンスを使用します")
+            print(f"🔗 実際のMCP Gateway接続テスト: {self.gateway_endpoint}")
             
-            # モックレスポンス
-            mock_response = {
-                "jsonrpc": "2.0",
-                "result": {
-                    "tools": [
-                        {"name": "UserManagement.addUser", "description": "新しいユーザー情報を作成する"},
-                        {"name": "UserManagement.updateUser", "description": "ユーザー情報を更新する"},
-                        {"name": "UserManagement.getUser", "description": "ユーザー情報を取得する"},
-                        {"name": "HealthGoalManagement.addGoal", "description": "新しい健康目標を追加する"},
-                        {"name": "HealthGoalManagement.updateGoal", "description": "既存の健康目標を更新する"},
-                        {"name": "HealthGoalManagement.deleteGoal", "description": "指定した健康目標を削除する"},
-                        {"name": "HealthGoalManagement.getGoals", "description": "ユーザーのすべての健康目標を取得する"},
-                        {"name": "HealthPolicyManagement.addPolicy", "description": "新しい健康ポリシーを追加する"},
-                        {"name": "HealthPolicyManagement.updatePolicy", "description": "既存の健康ポリシーを更新する"},
-                        {"name": "HealthPolicyManagement.deletePolicy", "description": "指定した健康ポリシーを削除する"},
-                        {"name": "HealthPolicyManagement.getPolicies", "description": "ユーザーのすべての健康ポリシーを取得する"},
-                        {"name": "ActivityManagement.addActivities", "description": "指定した日に新しい活動を追加する"},
-                        {"name": "ActivityManagement.updateActivity", "description": "指定した日の特定の時刻の活動だけを部分的に更新する"},
-                        {"name": "ActivityManagement.updateActivities", "description": "指定した日の全ての活動を完全に置き換える"},
-                        {"name": "ActivityManagement.deleteActivity", "description": "指定した日の指定した行動を削除する"},
-                        {"name": "ActivityManagement.getActivities", "description": "指定した日のユーザーの行動を取得する"},
-                        {"name": "ActivityManagement.getActivitiesInRange", "description": "指定した期間のユーザーの行動履歴を取得する"}
-                    ]
-                },
-                "id": 1
-            }
+            # 実際のAgentCore Gatewayに接続
+            response = requests.post(
+                self.gateway_endpoint,
+                headers=headers,
+                json=mcp_request,
+                timeout=30
+            )
             
-            print("✅ MCP接続成功（モック）")
-            print(f"   利用可能なツール数: {len(mock_response['result']['tools'])}")
+            if response.status_code == 200:
+                mcp_response = response.json()
+                print("✅ MCP接続成功")
+                
+                if 'result' in mcp_response and 'tools' in mcp_response['result']:
+                    tools = mcp_response['result']['tools']
+                    print(f"   利用可能なツール数: {len(tools)}")
+                    
+                    # ツールリストを表示
+                    print("   利用可能なツール:")
+                    for tool in tools:
+                        print(f"     - {tool['name']}: {tool.get('description', 'No description')}")
+                else:
+                    print("   ツールリストが見つかりません")
+                
+                return True
+            else:
+                print(f"❌ MCP接続失敗: HTTP {response.status_code}")
+                print(f"   Response: {response.text}")
+                return False
             
-            # ツールリストを表示
-            print("   利用可能なツール:")
-            for tool in mock_response['result']['tools']:
-                print(f"     - {tool['name']}: {tool['description']}")
-            
-            return True
-            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ MCP接続失敗 (Network): {str(e)}")
+            return False
         except Exception as e:
             print(f"❌ MCP接続失敗: {str(e)}")
             return False
     
-    def test_lambda_functions_directly(self) -> bool:
-        """Lambda関数を直接テスト"""
-        print("🧪 Lambda関数を直接テスト中...")
+    def test_mcp_tools(self) -> bool:
+        """実際のMCPツールを呼び出してテスト"""
+        print("🧪 MCP ツール呼び出しテスト中...")
         
-        lambda_client = boto3.client('lambda', region_name=AWS_REGION)
+        if not self.gateway_endpoint or not self.access_token:
+            print("❌ Gateway EndpointまたはAccess Tokenが設定されていません")
+            return False
         
-        # テストケース0: UserLambda（healthmate-usersテーブル）
-        print("\n--- UserLambda テスト ---")
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        success = True
+        
+        # テスト1: UserManagement.AddUser
+        print("\n--- UserManagement.AddUser テスト ---")
         try:
-            # ユーザー情報を追加
-            add_user_payload = {
-                "userId": self.user_id,
-                "username": TEST_USERNAME,
-                "email": TEST_EMAIL
-            }
-            
-            response = lambda_client.invoke(
-                FunctionName='healthmanagermcp-user',
-                InvocationType='RequestResponse',
-                Payload=json.dumps(add_user_payload)
-            )
-            
-            result = json.loads(response['Payload'].read())
-            print(f"✅ ユーザー情報追加: {result}")
-            
-            if result.get('success'):
-                # ユーザー情報を取得
-                get_user_payload = {
-                    "userId": self.user_id
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-user',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(get_user_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ ユーザー情報取得: {result}")
-                
-                # ユーザー情報を更新
-                update_user_payload = {
-                    "userId": self.user_id,
-                    "username": f"{TEST_USERNAME}_updated",
-                    "lastLoginAt": datetime.now().isoformat()
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-user',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(update_user_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ ユーザー情報更新: {result}")
-                
-        except Exception as e:
-            print(f"❌ UserLambda テスト失敗: {str(e)}")
-        
-        # テストケース1: HealthGoalLambda
-        print("\n--- HealthGoalLambda テスト ---")
-        try:
-            # 健康目標を追加
-            add_goal_payload = {
-                "userId": self.user_id,
-                "goalType": "fitness",
-                "title": "アスリート体型になる",
-                "description": "体脂肪率を15%以下にして筋肉量を増やす",
-                "targetValue": "体脂肪率15%",
-                "targetDate": "2025-12-31",
-                "priority": 3
-            }
-            
-            response = lambda_client.invoke(
-                FunctionName='healthmanagermcp-health-goal',
-                InvocationType='RequestResponse',
-                Payload=json.dumps(add_goal_payload)
-            )
-            
-            result = json.loads(response['Payload'].read())
-            print(f"✅ 健康目標追加: {result}")
-            
-            if result.get('success'):
-                goal_id = result.get('goalId')
-                
-                # 健康目標を取得
-                get_goals_payload = {
-                    "userId": self.user_id
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-health-goal',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(get_goals_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 健康目標取得: {result}")
-                
-                # 健康目標を更新
-                if goal_id:
-                    update_goal_payload = {
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "UserManagement___AddUser",
+                    "arguments": {
                         "userId": self.user_id,
-                        "goalId": goal_id,
-                        "description": "体脂肪率を12%以下にして筋肉量を大幅に増やす（更新）",
-                        "status": "active"
+                        "username": TEST_USERNAME,
+                        "email": TEST_EMAIL
                     }
-                    
-                    response = lambda_client.invoke(
-                        FunctionName='healthmanagermcp-health-goal',
-                        InvocationType='RequestResponse',
-                        Payload=json.dumps(update_goal_payload)
-                    )
-                    
-                    result = json.loads(response['Payload'].read())
-                    print(f"✅ 健康目標更新: {result}")
-                
-        except Exception as e:
-            print(f"❌ HealthGoalLambda テスト失敗: {str(e)}")
-        
-        # テストケース2: HealthPolicyLambda
-        print("\n--- HealthPolicyLambda テスト ---")
-        try:
-            # 健康ポリシーを追加
-            add_policy_payload = {
-                "userId": self.user_id,
-                "policyType": "fasting",
-                "description": "毎日16時間のファスティングを実施",
-                "parameters": {
-                    "fastingHours": 16,
-                    "eatingWindow": "12:00-20:00"
-                }
+                },
+                "id": 2
             }
             
-            response = lambda_client.invoke(
-                FunctionName='healthmanagermcp-health-policy',
-                InvocationType='RequestResponse',
-                Payload=json.dumps(add_policy_payload)
+            response = requests.post(
+                self.gateway_endpoint,
+                headers=headers,
+                json=mcp_request,
+                timeout=30
             )
             
-            result = json.loads(response['Payload'].read())
-            print(f"✅ 健康ポリシー追加: {result}")
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ AddUser成功: {result}")
+            else:
+                print(f"❌ AddUser失敗: HTTP {response.status_code} - {response.text}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ AddUser例外: {str(e)}")
+            success = False
+        
+        # テスト2: UserManagement.GetUser
+        print("\n--- UserManagement.GetUser テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "UserManagement___GetUser",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 3
+            }
             
-            if result.get('success'):
-                policy_id = result.get('policyId')
+            response = requests.post(
+                self.gateway_endpoint,
+                headers=headers,
+                json=mcp_request,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ GetUser成功: {result}")
+            else:
+                print(f"❌ GetUser失敗: HTTP {response.status_code} - {response.text}")
+                success = False
                 
-                # 健康ポリシーを取得
-                get_policies_payload = {
-                    "userId": self.user_id
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-health-policy',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(get_policies_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 健康ポリシー取得: {result}")
-                
-                # 健康ポリシーを更新
-                if policy_id:
-                    update_policy_payload = {
+        except Exception as e:
+            print(f"❌ GetUser例外: {str(e)}")
+            success = False
+        
+        # テスト3: HealthGoalManagement.AddGoal
+        print("\n--- HealthGoalManagement.AddGoal テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthGoalManagement___AddGoal",
+                    "arguments": {
                         "userId": self.user_id,
-                        "policyId": policy_id,
-                        "description": "毎日18時間のファスティングを実施（更新）",
-                        "parameters": {
-                            "fastingHours": 18,
-                            "eatingWindow": "12:00-18:00"
+                        "goalType": "fitness",
+                        "title": "アスリート体型になる",
+                        "description": "体脂肪率を15%以下にして筋肉量を増やす",
+                        "targetValue": "体脂肪率15%",
+                        "targetDate": "2025-12-31",
+                        "priority": 3
+                    }
+                },
+                "id": 4
+            }
+            
+            response = requests.post(
+                f"{self.gateway_endpoint}/mcp",
+                headers=headers,
+                json=mcp_request,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ AddGoal成功: {result}")
+            else:
+                print(f"❌ AddGoal失敗: HTTP {response.status_code} - {response.text}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ AddGoal例外: {str(e)}")
+            success = False
+        
+        # テスト4: HealthPolicyManagement.AddPolicy
+        print("\n--- HealthPolicyManagement.AddPolicy テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthPolicyManagement___AddPolicy",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "policyType": "fasting",
+                        "title": "16時間ファスティング",
+                        "description": "毎日16時間のファスティングを実施",
+                        "rules": {
+                            "fastingHours": 16,
+                            "eatingWindow": "12:00-20:00"
                         }
                     }
-                    
-                    response = lambda_client.invoke(
-                        FunctionName='healthmanagermcp-health-policy',
-                        InvocationType='RequestResponse',
-                        Payload=json.dumps(update_policy_payload)
-                    )
-                    
-                    result = json.loads(response['Payload'].read())
-                    print(f"✅ 健康ポリシー更新: {result}")
+                },
+                "id": 5
+            }
+            
+            response = requests.post(
+                f"{self.gateway_endpoint}/mcp",
+                headers=headers,
+                json=mcp_request,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ AddPolicy成功: {result}")
+            else:
+                print(f"❌ AddPolicy失敗: HTTP {response.status_code} - {response.text}")
+                success = False
                 
         except Exception as e:
-            print(f"❌ HealthPolicyLambda テスト失敗: {str(e)}")
+            print(f"❌ AddPolicy例外: {str(e)}")
+            success = False
         
-        # テストケース3: ActivityLambda
-        print("\n--- ActivityLambda テスト ---")
+        # テスト5: ActivityManagement.AddActivities
+        print("\n--- ActivityManagement.AddActivities テスト ---")
         try:
-            # 活動記録を追加
             today = datetime.now().strftime("%Y-%m-%d")
-            add_activities_payload = {
-                "operationType": "append",
-                "userId": self.user_id,
-                "date": today,
-                "activities": [
-                    {
-                        "time": "08:00",
-                        "activityType": "wakeUp",
-                        "description": "起床",
-                        "items": ["自然に目覚めた"]
-                    },
-                    {
-                        "time": "08:30",
-                        "activityType": "exercise",
-                        "description": "運動",
-                        "items": ["ジョギング30分", "筋トレ20分"]
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "ActivityManagement___AddActivities",
+                    "arguments": {
+                        "operationType": "append",
+                        "userId": self.user_id,
+                        "date": today,
+                        "activities": [
+                            {
+                                "time": "08:00",
+                                "activityType": "wakeUp",
+                                "description": "起床",
+                                "items": ["自然に目覚めた"]
+                            },
+                            {
+                                "time": "08:30",
+                                "activityType": "exercise",
+                                "description": "運動",
+                                "items": ["ジョギング30分", "筋トレ20分"]
+                            }
+                        ]
                     }
-                ]
+                },
+                "id": 6
             }
             
-            response = lambda_client.invoke(
-                FunctionName='healthmanagermcp-activity',
-                InvocationType='RequestResponse',
-                Payload=json.dumps(add_activities_payload)
+            response = requests.post(
+                f"{self.gateway_endpoint}/mcp",
+                headers=headers,
+                json=mcp_request,
+                timeout=30
             )
             
-            result = json.loads(response['Payload'].read())
-            print(f"✅ 活動記録追加: {result}")
-            
-            if result.get('success'):
-                # 活動記録を取得
-                get_activities_payload = {
-                    "userId": self.user_id,
-                    "date": today
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-activity',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(get_activities_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 活動記録取得: {result}")
-                
-                # 特定の活動を更新（UpdateActivity）
-                update_activity_payload = {
-                    "userId": self.user_id,
-                    "date": today,
-                    "time": "08:30",
-                    "activityType": "exercise",
-                    "description": "運動（更新）",
-                    "items": ["ジョギング45分", "筋トレ30分"]
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-activity',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(update_activity_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 特定活動更新: {result}")
-                
-                # 期間内活動記録を取得（GetActivitiesInRange）
-                yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-                get_range_payload = {
-                    "userId": self.user_id,
-                    "startDate": yesterday,
-                    "endDate": today
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-activity',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(get_range_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 期間内活動記録取得: {result}")
-                
-                # bowelMovement活動タイプのテスト（ChatGPTで問題になったケース）
-                bowel_activity_payload = {
-                    "operationType": "append",
-                    "userId": self.user_id,
-                    "date": today,
-                    "activities": [
-                        {
-                            "time": "13:00",
-                            "activityType": "bowelMovement",
-                            "description": "排便",
-                            "items": ["正常な排便"]
-                        }
-                    ]
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-activity',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(bowel_activity_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 排便活動記録追加: {result}")
-                
-                # 全活動タイプのテスト（MCPスキーマで定義されているすべてのactivityType）
-                all_activity_types_payload = {
-                    "operationType": "append",
-                    "userId": self.user_id,
-                    "date": today,
-                    "activities": [
-                        {
-                            "time": "14:00",
-                            "activityType": "meal",
-                            "description": "昼食",
-                            "items": ["サラダ", "チキン", "玄米"]
-                        },
-                        {
-                            "time": "15:00",
-                            "activityType": "snack",
-                            "description": "おやつ",
-                            "items": ["ナッツ", "フルーツ"]
-                        },
-                        {
-                            "time": "16:00",
-                            "activityType": "weight",
-                            "description": "体重測定",
-                            "items": ["70.5kg"]
-                        },
-                        {
-                            "time": "17:00",
-                            "activityType": "mood",
-                            "description": "気分記録",
-                            "items": ["良好", "エネルギッシュ"]
-                        },
-                        {
-                            "time": "18:00",
-                            "activityType": "medication",
-                            "description": "薬の服用",
-                            "items": ["ビタミンD", "オメガ3"]
-                        }
-                    ]
-                }
-                
-                response = lambda_client.invoke(
-                    FunctionName='healthmanagermcp-activity',
-                    InvocationType='RequestResponse',
-                    Payload=json.dumps(all_activity_types_payload)
-                )
-                
-                result = json.loads(response['Payload'].read())
-                print(f"✅ 全活動タイプテスト: {result}")
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ AddActivities成功: {result}")
+            else:
+                print(f"❌ AddActivities失敗: HTTP {response.status_code} - {response.text}")
+                success = False
                 
         except Exception as e:
-            print(f"❌ ActivityLambda テスト失敗: {str(e)}")
+            print(f"❌ AddActivities例外: {str(e)}")
+            success = False
         
-        return True
+        return success
+    
+
     
     def cleanup_test_user(self) -> bool:
         """テストユーザーを削除"""
@@ -678,8 +534,8 @@ class HealthManagerMCPTestClient:
         if not self.test_mcp_connection():
             success = False
         
-        # 5. Lambda関数直接テスト
-        if not self.test_lambda_functions_directly():
+        # 5. MCPツール呼び出しテスト
+        if not self.test_mcp_tools():
             success = False
         
         # 6. クリーンアップ

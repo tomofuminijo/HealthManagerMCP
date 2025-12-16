@@ -62,21 +62,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         user_id = parameters["userId"]
         print(f"[UserLambda] Processing request for userId: {user_id}")
         
-        # MCPツール名を推測（パラメータから判断）
-        if "username" in parameters and len([k for k in parameters.keys() if k != "userId"]) >= 1:
-            # usernameが含まれている場合はAddUserまたはUpdateUser
-            # 既存ユーザーの確認は不要なので、常にupsert（AddUser）として扱う
-            tool_name = "AddUser"
-        elif any(key in parameters for key in ["username", "email", "lastLoginAt"]):
-            # 更新用のフィールドが含まれている場合はUpdateUser
-            tool_name = "UpdateUser"
-        elif len(parameters) == 1 and "userId" in parameters:
-            # userIdのみの場合はGetUser
-            tool_name = "GetUser"
-        else:
-            raise ValueError(f"Cannot determine operation from parameters: {list(parameters.keys())}")
-        
-        print(f"[UserLambda] Inferred operation: {tool_name}")
+        # contextからツール名を取得
+        tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
+        print(f"[UserLambda] Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddUser":

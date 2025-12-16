@@ -81,30 +81,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         user_id = parameters["userId"]
         print(f"[ActivityLambda] Processing request for userId: {user_id}")
         
-        # MCPツール名を推測（パラメータから判断）
-        if "activities" in parameters and isinstance(parameters["activities"], list):
-            # AddActivitiesまたはUpdateActivities
-            # 設計書に従い、デフォルトはAddActivities（既存の活動に追加）
-            # UpdateActivitiesは全活動の置き換えなので、明示的に指定される必要がある
-            if parameters.get("replaceAll") is True:
-                tool_name = "UpdateActivities"
-            else:
-                tool_name = "AddActivities"
-        elif "startDate" in parameters and "endDate" in parameters:
-            tool_name = "GetActivitiesInRange"
-        elif "date" in parameters and "time" in parameters:
-            # UpdateActivityまたはDeleteActivity
-            if any(key in parameters for key in ["activityType", "description", "items"]):
-                tool_name = "UpdateActivity"
-            else:
-                tool_name = "DeleteActivity"
-        elif "date" in parameters and len([k for k in parameters.keys() if k not in ["userId", "date"]]) == 0:
-            # dateのみが指定されている場合は取得
-            tool_name = "GetActivities"
-        else:
-            raise ValueError(f"Cannot determine operation from parameters: {list(parameters.keys())}")
-        
-        print(f"[ActivityLambda] Inferred operation: {tool_name}")
+        # contextからツール名を取得
+        tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
+        print(f"[ActivityLambda] Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddActivities":

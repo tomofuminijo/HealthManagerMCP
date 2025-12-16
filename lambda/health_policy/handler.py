@@ -66,23 +66,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         user_id = parameters["userId"]
         print(f"[HealthPolicyLambda] Processing request for userId: {user_id}")
         
-        # MCPツール名を推測（パラメータから判断）
-        if "policyType" in parameters and "policyId" not in parameters:
-            # 新しいポリシーを追加（policyTypeがあり、policyIdがない場合）
-            tool_name = "AddPolicy"
-        elif "policyId" in parameters and any(key in parameters for key in ["title", "description", "rules", "parameters", "isActive", "startDate", "endDate"]):
-            # 既存のポリシーを更新
-            tool_name = "UpdatePolicy"
-        elif "policyId" in parameters and len([k for k in parameters.keys() if k not in ["userId", "policyId"]]) == 0:
-            # policyIdのみが指定されている場合は削除
-            tool_name = "DeletePolicy"
-        elif len(parameters) == 1 and "userId" in parameters:
-            # userIdのみの場合は全ポリシー取得
-            tool_name = "GetPolicies"
-        else:
-            raise ValueError(f"Cannot determine operation from parameters: {list(parameters.keys())}")
-        
-        print(f"[HealthPolicyLambda] Inferred operation: {tool_name}")
+        # contextからツール名を取得
+        tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
+        print(f"[HealthPolicyLambda] Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddPolicy":

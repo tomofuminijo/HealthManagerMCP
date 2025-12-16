@@ -5,10 +5,10 @@ HealthManagerMCP（Healthmateエコシステム）の健康目標管理を担当
 AgentCore Gateway（MCP）から呼び出され、DynamoDBで健康目標のCRUD操作を実行します。
 
 機能:
-- addGoal: 新しい健康目標を作成（UUIDでgoalId生成）
-- updateGoal: 既存の健康目標を更新
-- deleteGoal: 指定した健康目標を削除
-- getGoals: ユーザーのすべての健康目標を取得
+- AddGoal: 新しい健康目標を作成（UUIDでgoalId生成）
+- UpdateGoal: 既存の健康目標を更新
+- DeleteGoal: 指定した健康目標を削除
+- GetGoals: ユーザーのすべての健康目標を取得
 
 要件: 要件3（健康目標管理）、要件11（データ永続化）、要件12（エラーハンドリング）、要件13（ロギング）
 """
@@ -67,23 +67,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         user_id = parameters["userId"]
         print(f"[HealthGoalLambda] Processing request for userId: {user_id}")
         
-        # MCPツール名を推測（パラメータから判断）
-        if "goalType" in parameters and "goalId" not in parameters:
-            # 新しい目標を追加（goalTypeがあり、goalIdがない場合）
-            tool_name = "AddGoal"
-        elif "goalId" in parameters and any(key in parameters for key in ["title", "description", "targetValue", "targetDate", "priority", "status"]):
-            # 既存の目標を更新
-            tool_name = "UpdateGoal"
-        elif "goalId" in parameters and len([k for k in parameters.keys() if k not in ["userId", "goalId"]]) == 0:
-            # goalIdのみが指定されている場合は削除
-            tool_name = "DeleteGoal"
-        elif len(parameters) == 1 and "userId" in parameters:
-            # userIdのみの場合は全目標取得
-            tool_name = "GetGoals"
-        else:
-            raise ValueError(f"Cannot determine operation from parameters: {list(parameters.keys())}")
-        
-        print(f"[HealthGoalLambda] Inferred operation: {tool_name}")
+        # contextからツール名を取得
+        tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
+        print(f"[HealthGoalLambda] Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddGoal":
