@@ -42,7 +42,7 @@
   - Python import文の検証
   - _Requirements: 5.4_
 
-- [-] 2. Phase 2: Cross-Service Updates
+- [x] 2. Phase 2: Cross-Service Updates
   - 他のサービスの設定更新と環境変数の変更
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
@@ -82,7 +82,7 @@
 - [ ] 3. Checkpoint - Validate all local changes
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Phase 3: Repository and Final Updates
+- [-] 4. Phase 3: Repository and Final Updates
   - GitHubリポジトリ名変更とドキュメントリンク更新
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
@@ -90,22 +90,22 @@
   - **Property 5: Documentation link consistency**
   - **Validates: Requirements 4.4**
 
-- [ ] 4.2 Prepare repository rename instructions
+- [x] 4.2 Prepare repository rename instructions
   - GitHubでのリポジトリ名変更手順書を作成
   - リモートURL更新コマンドを準備
   - _Requirements: 4.1, 4.2, 5.1_
 
-- [ ] 4.3 Update documentation links and clone commands
+- [x] 4.3 Update documentation links and clone commands
   - README.md内のリポジトリURLを更新
   - SETUP.md内のクローンコマンドを更新
   - _Requirements: 4.3, 4.4_
 
-- [ ] 4.4 Update CI/CD configuration references
+- [x] 4.4 Update CI/CD configuration references
   - GitHub Actions設定ファイルがあれば更新
   - その他のCI/CD設定の確認
   - _Requirements: 4.5_
 
-- [ ] 4.5 Create rollback procedure documentation
+- [x] 4.5 Create rollback procedure documentation
   - 各段階でのロールバック手順を文書化
   - 緊急時の復旧手順を作成
   - _Requirements: 5.3_
