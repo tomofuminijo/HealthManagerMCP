@@ -1,11 +1,11 @@
-# HealthManagerMCP
+# Healthmate-HealthManager
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![AWS CDK](https://img.shields.io/badge/AWS-CDK-orange.svg)](https://aws.amazon.com/cdk/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-**HealthManagerMCP**は、Healthmateエコシステムの中核となる健康情報管理MCPサーバーです。AWS上でサーバーレスアーキテクチャを採用し、AI健康コーチや外部AIクライアント（ChatGPT、Claude等）との連携を可能にします。
+**Healthmate-HealthManager**は、Healthmateエコシステムの中核となる健康情報管理MCPサーバーです。AWS上でサーバーレスアーキテクチャを採用し、AI健康コーチや外部AIクライアント（ChatGPT、Claude等）との連携を可能にします。
 
 ## 🌟 特徴
 
@@ -20,7 +20,7 @@
 
 ```mermaid
 graph TB
-    A[HealthmateUI<br/>Web Frontend] --> B[HealthManagerMCP<br/>MCP Server]
+    A[HealthmateUI<br/>Web Frontend] --> B[Healthmate-HealthManager<br/>MCP Server]
     C[HealthCoachAI<br/>AI Agent] --> B
     D[ChatGPT] --> B
     E[Claude] --> B
@@ -31,7 +31,7 @@ graph TB
     B --> I[Cognito]
 ```
 
-- **HealthManagerMCP**（このプロジェクト）: 健康情報管理MCPサーバー
+- **Healthmate-HealthManager**（このプロジェクト）: 健康情報管理MCPサーバー
 - **HealthCoachAI**（別プロジェクト）: AI健康コーチエージェント
 - **HealthmateUI**（別プロジェクト）: Webフロントエンドアプリケーション
 
@@ -54,7 +54,7 @@ graph TB
 
 ## MCPツール
 
-HealthManagerMCPは以下のMCPツールを提供します：
+Healthmate-HealthManagerは以下のMCPツールを提供します：
 
 ### UserManagement
 - `addUser`: 新しいユーザー情報を作成
@@ -115,8 +115,8 @@ sequenceDiagram
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/tomofuminijo/HealthManagerMCP.git
-cd HealthManagerMCP
+git clone https://github.com/tomofuminijo/Healthmate-HealthManager.git
+cd Healthmate-HealthManager
 
 # Python仮想環境を作成
 python3.12 -m venv .venv
@@ -157,9 +157,9 @@ python test_mcp_client.py
 
 - **[セットアップガイド](SETUP.md)**: 環境構築からデプロイまでの詳細手順
 - **[API仕様書](MCP_API_SPECIFICATION.md)**: 全MCPツールのAPI仕様
-- **[要件定義](.kiro/specs/healthmanagermcp/requirements.md)**: システム要件の詳細
-- **[設計書](.kiro/specs/healthmanagermcp/design.md)**: アーキテクチャと設計決定
-- **[実装タスク](.kiro/specs/healthmanagermcp/tasks.md)**: 開発進捗と実装計画
+- **[要件定義](.kiro/specs/healthmate-healthmanager/requirements.md)**: システム要件の詳細
+- **[設計書](.kiro/specs/healthmate-healthmanager/design.md)**: アーキテクチャと設計決定
+- **[実装タスク](.kiro/specs/healthmate-healthmanager/tasks.md)**: 開発進捗と実装計画
 
 ## 🧪 テスト
 
@@ -185,7 +185,7 @@ python test_mcp_client.py
 ```javascript
 // ChatGPT Action設定例
 {
-  "name": "HealthManagerMCP",
+  "name": "Healthmate-HealthManager",
   "description": "健康情報管理システム",
   "authentication": "OAuth 2.0",
   "client_id": "YOUR_COGNITO_CLIENT_ID",
@@ -239,4 +239,4 @@ client = anthropic.Anthropic(
 
 ---
 
-**HealthManagerMCP** - Empowering AI-driven health management 🏥✨
+**Healthmate-HealthManager** - Empowering AI-driven health management 🏥✨

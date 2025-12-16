@@ -16,9 +16,9 @@ import os
 import json
 
 
-class HealthManagerMCPStack(Stack):
+class HealthmateHealthManagerStack(Stack):
     """
-    Main CDK Stack for HealthManagerMCP Application
+    Main CDK Stack for Healthmate-HealthManager Application
 
     This stack manages the following resources:
     - DynamoDB Tables (Users, Health Goals, Health Policies, Activity Records)
@@ -494,7 +494,7 @@ class HealthManagerMCPStack(Stack):
             "UserPoolId",
             value=self.user_pool.user_pool_id,
             description="Cognito User Pool ID",
-            export_name="HealthManagerMCP-UserPoolId"
+            export_name="Healthmate-HealthManager-UserPoolId"
         )
 
         CfnOutput(
@@ -502,7 +502,7 @@ class HealthManagerMCPStack(Stack):
             "UserPoolClientId", 
             value=self.user_pool_client.user_pool_client_id,
             description="Cognito User Pool Client ID",
-            export_name="HealthManagerMCP-UserPoolClientId"
+            export_name="Healthmate-HealthManager-UserPoolClientId"
         )
 
         CfnOutput(
@@ -510,7 +510,7 @@ class HealthManagerMCPStack(Stack):
             "AuthorizationUrl",
             value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/authorize",
             description="OAuth 2.0 Authorization URL",
-            export_name="HealthManagerMCP-AuthorizationUrl"
+            export_name="Healthmate-HealthManager-AuthorizationUrl"
         )
 
         CfnOutput(
@@ -518,7 +518,7 @@ class HealthManagerMCPStack(Stack):
             "TokenUrl",
             value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
             description="OAuth 2.0 Token URL", 
-            export_name="HealthManagerMCP-TokenUrl"
+            export_name="Healthmate-HealthManager-TokenUrl"
         )
 
         CfnOutput(
@@ -526,7 +526,7 @@ class HealthManagerMCPStack(Stack):
             "GatewayEndpoint",
             value=f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
             description="AgentCore Gateway Endpoint",
-            export_name="HealthManagerMCP-GatewayEndpoint"
+            export_name="Healthmate-HealthManager-GatewayEndpoint"
         )
 
         CfnOutput(
@@ -534,7 +534,7 @@ class HealthManagerMCPStack(Stack):
             "Region",
             value=self.region,
             description="AWS Region",
-            export_name="HealthManagerMCP-Region"
+            export_name="Healthmate-HealthManager-Region"
         )
 
         CfnOutput(
@@ -542,7 +542,7 @@ class HealthManagerMCPStack(Stack):
             "AccountId",
             value=self.account,
             description="AWS Account ID",
-            export_name="HealthManagerMCP-AccountId"
+            export_name="Healthmate-HealthManager-AccountId"
         )
 
         # 中優先度（推奨）
@@ -552,7 +552,7 @@ class HealthManagerMCPStack(Stack):
             "GatewayName",
             value="healthmate-gateway",
             description="AgentCore Gateway Name",
-            export_name="HealthManagerMCP-GatewayName"
+            export_name="Healthmate-HealthManager-GatewayName"
         )
 
         CfnOutput(
@@ -560,7 +560,7 @@ class HealthManagerMCPStack(Stack):
             "GatewayId",
             value=self.agentcore_gateway.ref,
             description="AgentCore Gateway ID",
-            export_name="HealthManagerMCP-GatewayId"
+            export_name="Healthmate-HealthManager-GatewayId"
         )
 
         # Lambda関数ARN
@@ -569,7 +569,7 @@ class HealthManagerMCPStack(Stack):
             "UserLambdaArn",
             value=self.user_lambda.function_arn,
             description="User Lambda Function ARN",
-            export_name="HealthManagerMCP-UserLambdaArn"
+            export_name="Healthmate-HealthManager-UserLambdaArn"
         )
 
         CfnOutput(
@@ -577,7 +577,7 @@ class HealthManagerMCPStack(Stack):
             "HealthGoalLambdaArn",
             value=self.health_goal_lambda.function_arn,
             description="Health Goal Lambda Function ARN",
-            export_name="HealthManagerMCP-HealthGoalLambdaArn"
+            export_name="Healthmate-HealthManager-HealthGoalLambdaArn"
         )
 
         CfnOutput(
@@ -585,7 +585,7 @@ class HealthManagerMCPStack(Stack):
             "HealthPolicyLambdaArn",
             value=self.health_policy_lambda.function_arn,
             description="Health Policy Lambda Function ARN",
-            export_name="HealthManagerMCP-HealthPolicyLambdaArn"
+            export_name="Healthmate-HealthManager-HealthPolicyLambdaArn"
         )
 
         CfnOutput(
@@ -593,7 +593,7 @@ class HealthManagerMCPStack(Stack):
             "ActivityLambdaArn",
             value=self.activity_lambda.function_arn,
             description="Activity Lambda Function ARN",
-            export_name="HealthManagerMCP-ActivityLambdaArn"
+            export_name="Healthmate-HealthManager-ActivityLambdaArn"
         )
 
         # DynamoDBテーブル名
@@ -602,7 +602,7 @@ class HealthManagerMCPStack(Stack):
             "UsersTableName",
             value=self.users_table.table_name,
             description="Users DynamoDB Table Name",
-            export_name="HealthManagerMCP-UsersTableName"
+            export_name="Healthmate-HealthManager-UsersTableName"
         )
 
         CfnOutput(
@@ -610,7 +610,7 @@ class HealthManagerMCPStack(Stack):
             "GoalsTableName",
             value=self.goals_table.table_name,
             description="Goals DynamoDB Table Name",
-            export_name="HealthManagerMCP-GoalsTableName"
+            export_name="Healthmate-HealthManager-GoalsTableName"
         )
 
         CfnOutput(
@@ -618,7 +618,7 @@ class HealthManagerMCPStack(Stack):
             "PoliciesTableName",
             value=self.policies_table.table_name,
             description="Policies DynamoDB Table Name",
-            export_name="HealthManagerMCP-PoliciesTableName"
+            export_name="Healthmate-HealthManager-PoliciesTableName"
         )
 
         CfnOutput(
@@ -626,7 +626,7 @@ class HealthManagerMCPStack(Stack):
             "ActivitiesTableName",
             value=self.activities_table.table_name,
             description="Activities DynamoDB Table Name",
-            export_name="HealthManagerMCP-ActivitiesTableName"
+            export_name="Healthmate-HealthManager-ActivitiesTableName"
         )
 
         # DynamoDBテーブルARN
@@ -635,7 +635,7 @@ class HealthManagerMCPStack(Stack):
             "UsersTableArn",
             value=self.users_table.table_arn,
             description="Users DynamoDB Table ARN",
-            export_name="HealthManagerMCP-UsersTableArn"
+            export_name="Healthmate-HealthManager-UsersTableArn"
         )
 
         CfnOutput(
@@ -643,7 +643,7 @@ class HealthManagerMCPStack(Stack):
             "GoalsTableArn",
             value=self.goals_table.table_arn,
             description="Goals DynamoDB Table ARN",
-            export_name="HealthManagerMCP-GoalsTableArn"
+            export_name="Healthmate-HealthManager-GoalsTableArn"
         )
 
         CfnOutput(
@@ -651,7 +651,7 @@ class HealthManagerMCPStack(Stack):
             "PoliciesTableArn",
             value=self.policies_table.table_arn,
             description="Policies DynamoDB Table ARN",
-            export_name="HealthManagerMCP-PoliciesTableArn"
+            export_name="Healthmate-HealthManager-PoliciesTableArn"
         )
 
         CfnOutput(
@@ -659,7 +659,7 @@ class HealthManagerMCPStack(Stack):
             "ActivitiesTableArn",
             value=self.activities_table.table_arn,
             description="Activities DynamoDB Table ARN",
-            export_name="HealthManagerMCP-ActivitiesTableArn"
+            export_name="Healthmate-HealthManager-ActivitiesTableArn"
         )
 
         # 低優先度（便利）
@@ -668,7 +668,7 @@ class HealthManagerMCPStack(Stack):
             "JwksUrl",
             value=f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool.user_pool_id}/.well-known/jwks.json",
             description="JWKS URL for JWT token verification",
-            export_name="HealthManagerMCP-JwksUrl"
+            export_name="Healthmate-HealthManager-JwksUrl"
         )
 
         CfnOutput(
@@ -676,7 +676,7 @@ class HealthManagerMCPStack(Stack):
             "DiscoveryUrl",
             value=discovery_url,
             description="OIDC Discovery URL",
-            export_name="HealthManagerMCP-DiscoveryUrl"
+            export_name="Healthmate-HealthManager-DiscoveryUrl"
         )
 
         CfnOutput(
@@ -684,7 +684,7 @@ class HealthManagerMCPStack(Stack):
             "UserInfoUrl",
             value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/userInfo",
             description="OAuth 2.0 UserInfo URL",
-            export_name="HealthManagerMCP-UserInfoUrl"
+            export_name="Healthmate-HealthManager-UserInfoUrl"
         )
 
         # MCP接続設定（JSON形式）
@@ -713,5 +713,5 @@ class HealthManagerMCPStack(Stack):
             "MCPConnectionConfig",
             value=json.dumps(mcp_connection_config, indent=2),
             description="Complete MCP connection configuration (JSON)",
-            export_name="HealthManagerMCP-MCPConnectionConfig"
+            export_name="Healthmate-HealthManager-MCPConnectionConfig"
         )

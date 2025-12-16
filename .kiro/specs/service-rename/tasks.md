@@ -4,7 +4,7 @@
   - フォルダ名変更、CDK設定更新、ローカルドキュメント更新
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [-] 1.1 Create backup of current configuration
+- [x] 1.1 Create backup of current configuration
   - 現在の設定ファイルとドキュメントのバックアップを作成
   - Git commitで現在の状態を保存
   - _Requirements: 5.3_
@@ -13,7 +13,7 @@
   - **Property 1: Folder name consistency**
   - **Validates: Requirements 1.1**
 
-- [ ] 1.3 Update CDK stack name and class name
+- [x] 1.3 Update CDK stack name and class name
   - app.pyでスタック名を「Healthmate-HealthManagerStack」に変更
   - cdk_stack.pyでクラス名を「HealthmateHealthManagerStack」に変更
   - _Requirements: 1.2, 1.3_
@@ -22,7 +22,7 @@
   - **Property 2: Documentation reference consistency**
   - **Validates: Requirements 1.4**
 
-- [ ] 1.5 Update local documentation files
+- [x] 1.5 Update local documentation files
   - README.mdの全ての「HealthManagerMCP」参照を更新
   - SETUP.mdの全ての参照を更新
   - MCP_API_SPECIFICATION.mdの参照を更新
@@ -32,12 +32,12 @@
   - **Property 6: Complete reference update**
   - **Validates: Requirements 5.5**
 
-- [ ] 1.7 Update steering files in .kiro directory
+- [x] 1.7 Update steering files in .kiro directory
   - product.md, product-overview.md, structure.md, tech.mdの更新
   - 全ての「HealthManagerMCP」参照を「Healthmate-HealthManager」に変更
   - _Requirements: 1.4_
 
-- [ ] 1.8 Validate CDK configuration syntax
+- [x] 1.8 Validate CDK configuration syntax
   - CDK設定ファイルの構文チェック
   - Python import文の検証
   - _Requirements: 5.4_

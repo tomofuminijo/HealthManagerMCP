@@ -5,15 +5,15 @@
 The Healthmate ecosystem consists of three separate workspace folders:
 
 ```
-HealthManagerMCP/          # MCP server backend
+Healthmate-HealthManager/          # MCP server backend
 HealthCoachAI/            # AI agent
 HealthmateUI/             # Web frontend
 ```
 
-## HealthManagerMCP Structure
+## Healthmate-HealthManager Structure
 
 ```
-HealthManagerMCP/
+Healthmate-HealthManager/
 ├── cdk/                           # AWS CDK infrastructure
 │   ├── cdk/                      # CDK Python modules
 │   ├── app.py                    # CDK app entry point
@@ -93,7 +93,7 @@ HealthmateUI/
 ## Naming Conventions
 
 ### Services
-- **HealthManagerMCP**: Backend MCP server
+- **Healthmate-HealthManager**: Backend MCP server
 - **HealthCoachAI**: AI agent
 - **HealthmateUI**: Frontend application
 
@@ -118,7 +118,7 @@ HealthmateUI/
 4. Deploy infrastructure before testing integration
 
 ### Deployment Order
-1. **HealthManagerMCP**: Deploy CDK stack first
+1. **Healthmate-HealthManager**: Deploy CDK stack first
 2. **HealthCoachAI**: Deploy agent after MCP backend
 3. **HealthmateUI**: Deploy frontend last
 

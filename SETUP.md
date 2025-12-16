@@ -1,8 +1,8 @@
-# HealthManagerMCP セットアップガイド
+# Healthmate-HealthManager セットアップガイド
 
 ## 概要
 
-HealthManagerMCPは、Healthmateエコシステムの健康情報管理MCPサーバーです。このガイドでは、環境構築からデプロイ、各種AIクライアントとの連携設定まで、すべての手順を説明します。
+Healthmate-HealthManagerは、Healthmateエコシステムの健康情報管理MCPサーバーです。このガイドでは、環境構築からデプロイ、各種AIクライアントとの連携設定まで、すべての手順を説明します。
 
 ## 前提条件
 
@@ -34,7 +34,7 @@ npx aws-cdk bootstrap aws://ACCOUNT-ID/us-west-2
 
 ```bash
 git clone <repository-url>
-cd healthmanagermcp
+cd healthmate-healthmanager
 ```
 
 ### 2. Python仮想環境のセットアップ
@@ -135,7 +135,7 @@ python test_mcp_client.py
 
 ```yaml
 # Action名
-HealthManagerMCP
+Healthmate-HealthManager
 
 # 説明
 健康情報管理システム（ユーザー情報、健康目標、健康ポリシー、活動記録の管理）
@@ -342,4 +342,4 @@ sleep 10
 
 ---
 
-このセットアップガイドに従って、HealthManagerMCPを正常にデプロイし、各種AIクライアントと連携できます。
+このセットアップガイドに従って、Healthmate-HealthManagerを正常にデプロイし、各種AIクライアントと連携できます。

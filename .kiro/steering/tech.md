@@ -6,7 +6,7 @@
 
 ## Core Technologies
 
-### Backend (HealthManagerMCP)
+### Backend (Healthmate-HealthManager)
 - **Runtime**: Python 3.12+
 - **Infrastructure**: AWS CDK (Python)
 - **Compute**: AWS Lambda functions
@@ -40,7 +40,7 @@
 
 ## Common Commands
 
-### HealthManagerMCP
+### Healthmate-HealthManager
 
 ```bash
 # Environment setup

@@ -1,8 +1,8 @@
-# HealthManagerMCP API仕様書
+# Healthmate-HealthManager API仕様書
 
 ## 概要
 
-HealthManagerMCPは、Model Context Protocol (MCP)を使用して健康情報管理機能を提供するサーバーです。本仕様書では、各MCPツールのAPI仕様、リクエスト/レスポンス形式、エラーハンドリングについて詳細に説明します。
+Healthmate-HealthManagerは、Model Context Protocol (MCP)を使用して健康情報管理機能を提供するサーバーです。本仕様書では、各MCPツールのAPI仕様、リクエスト/レスポンス形式、エラーハンドリングについて詳細に説明します。
 
 ## 認証
 

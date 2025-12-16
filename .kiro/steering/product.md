@@ -1,8 +1,8 @@
-# HealthManagerMCP サービス - MCP Backend
+# Healthmate-HealthManager サービス - MCP Backend
 
 ## Service Overview
 
-HealthManagerMCP サービスは、Healthmate プロダクトのバックエンドを担当するModel Context Protocol (MCP) サーバーです。健康データの永続化と外部AIクライアントへのAPI提供を行います。
+Healthmate-HealthManager サービスは、Healthmate プロダクトのバックエンドを担当するModel Context Protocol (MCP) サーバーです。健康データの永続化と外部AIクライアントへのAPI提供を行います。
 
 ### Primary Responsibilities
 

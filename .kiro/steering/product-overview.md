@@ -8,7 +8,7 @@ Healthmate プロダクトは、AI駆動の包括的健康管理プラットフ�
 
 Healthmate プロダクトは3つの独立したサービスで構成されています：
 
-### HealthManagerMCP サービス（このサービス）
+### Healthmate-HealthManager サービス（このサービス）
 - **役割**: 健康データ管理バックエンド
 - **技術**: Model Context Protocol (MCP) サーバー
 - **責任**: データ永続化、API提供、認証・認可
@@ -28,7 +28,7 @@ Healthmate プロダクトは3つの独立したサービスで構成されて�
 ### 階層構造
 - **プロダクト**: Healthmate プロダクト（完全なソリューション）
 - **ワークスペース**: Healthmate ワークスペース（開発環境）
-- **サービス**: 個別サービス（HealthManagerMCP、HealthCoachAI、HealthmateUI）
+- **サービス**: 個別サービス（Healthmate-HealthManager、HealthCoachAI、HealthmateUI）
 
 ### 命名規則
 - **サービス名**: 必ず「サービス」を付けて呼ぶ
@@ -43,7 +43,7 @@ HealthmateUI サービス
     ↓ (JWT Token + User Input)
 HealthCoachAI サービス  
     ↓ (MCP Protocol)
-HealthManagerMCP サービス
+Healthmate-HealthManager サービス
     ↓ (DynamoDB Operations)
 Health Data Storage
 ```
@@ -57,7 +57,7 @@ Health Data Storage
 
 ### 必須デプロイ順序
 ```
-1. HealthManagerMCP サービス（基盤インフラ）
+1. Healthmate-HealthManager サービス（基盤インフラ）
 2. HealthCoachAI サービス（AI エージェント）
 3. HealthmateUI サービス（フロントエンド）
 ```
