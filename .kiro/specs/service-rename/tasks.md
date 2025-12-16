@@ -82,7 +82,7 @@
 - [ ] 3. Checkpoint - Validate all local changes
   - Ensure all tests pass, ask the user if questions arise.
 
-- [-] 4. Phase 3: Repository and Final Updates
+- [x] 4. Phase 3: Repository and Final Updates
   - GitHubリポジトリ名変更とドキュメントリンク更新
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
@@ -113,7 +113,7 @@
 - [ ] 5. Final Checkpoint - Complete validation
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Execute folder rename
+- [-] 6. Execute folder rename
   - 実際のフォルダ名変更を実行
   - Git履歴の保持を確認
   - _Requirements: 1.1_
