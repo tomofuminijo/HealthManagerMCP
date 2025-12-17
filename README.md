@@ -141,6 +141,17 @@ cd ..
 ./create-gateway-targets.sh
 ```
 
+### アンデプロイ
+
+```bash
+# Gateway Targetsを削除
+./delete-gateway-targets.sh
+
+# CDKスタックを削除
+cd cdk
+cdk destroy
+```
+
 ### テスト実行
 
 ```bash
@@ -151,12 +162,46 @@ pytest tests/unit/ -v
 python test_mcp_client.py
 ```
 
-詳細なセットアップ手順は [SETUP.md](SETUP.md) を参照してください。
+## 📁 プロジェクト構成
+
+```
+Healthmate-HealthManager/
+├── cdk/                           # AWS CDK インフラストラクチャ
+│   ├── cdk/                      # CDK Python モジュール
+│   ├── app.py                    # CDK アプリケーションエントリーポイント
+│   ├── requirements.txt          # CDK 依存関係
+│   └── cdk.json                  # CDK 設定ファイル
+├── lambda/                       # Lambda 関数ハンドラー
+│   ├── user/handler.py          # ユーザー管理 Lambda
+│   ├── health_goal/handler.py   # 健康目標管理 Lambda
+│   ├── health_policy/handler.py # 健康ポリシー管理 Lambda
+│   └── activity/handler.py      # 活動記録管理 Lambda
+├── mcp-schema/                  # MCP ツールスキーマ定義
+│   ├── user-management-mcp-schema.json
+│   ├── health-goal-management-mcp-schema.json
+│   ├── health-policy-management-mcp-schema.json
+│   └── activity-management-mcp-schema.json
+├── tests/                       # テストスイート
+│   ├── unit/                    # 単体テスト
+│   └── integration/             # 統合テスト
+├── .kiro/specs/                 # 仕様書・設計書
+│   └── healthmate-healthmanager/
+│       ├── requirements.md      # システム要件
+│       ├── design.md           # アーキテクチャ設計
+│       └── tasks.md            # 実装タスク
+├── create-gateway-targets.sh   # Gateway セットアップスクリプト
+├── delete-gateway-targets.sh   # Gateway クリーンアップスクリプト
+├── test_mcp_client.py          # 統合テストクライアント
+├── requirements.txt            # Python 依存関係
+├── pytest.ini                 # テスト設定
+├── MCP_API_SPECIFICATION.md    # API 仕様書
+├── SETUP.md                    # セットアップガイド
+└── README.md                   # このファイル
+```
 
 ## 📖 ドキュメント
 
-- **[セットアップガイド](SETUP.md)**: 環境構築からデプロイまでの詳細手順
-- **[API仕様書](MCP_API_SPECIFICATION.md)**: 全MCPツールのAPI仕様
+- **[MCPスキーマ](mcp-schema/)**: 全MCPツールのAPI仕様（JSON Schema形式）
 - **[要件定義](.kiro/specs/healthmate-healthmanager/requirements.md)**: システム要件の詳細
 - **[設計書](.kiro/specs/healthmate-healthmanager/design.md)**: アーキテクチャと設計決定
 - **[実装タスク](.kiro/specs/healthmate-healthmanager/tasks.md)**: 開発進捗と実装計画

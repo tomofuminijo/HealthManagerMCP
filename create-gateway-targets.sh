@@ -53,7 +53,7 @@ echo "3. GatewayTargetを作成中..."
 echo "   3.1 UserManagement..."
 
 # MCPスキーマを読み込んでJSON文字列に変換
-USER_MCP_SCHEMA=$(cat user-management-mcp-schema.json | jq -c .)
+USER_MCP_SCHEMA=$(cat mcp-schema/user-management-mcp-schema.json | jq -c .)
 
 # TargetConfigurationのJSONを作成
 cat > /tmp/gateway-target-user.json <<EOF
@@ -82,7 +82,7 @@ echo "      ✓ UserManagement 作成完了"
 # 3.2 HealthGoalManagement
 echo "   3.2 HealthGoalManagement..."
 
-HEALTH_GOAL_MCP_SCHEMA=$(cat health-goal-management-mcp-schema.json | jq -c .)
+HEALTH_GOAL_MCP_SCHEMA=$(cat mcp-schema/health-goal-management-mcp-schema.json | jq -c .)
 
 cat > /tmp/gateway-target-health-goal.json <<EOF
 {
@@ -110,7 +110,7 @@ echo "      ✓ HealthGoalManagement 作成完了"
 # 3.3 HealthPolicyManagement
 echo "   3.3 HealthPolicyManagement..."
 
-HEALTH_POLICY_MCP_SCHEMA=$(cat health-policy-management-mcp-schema.json | jq -c .)
+HEALTH_POLICY_MCP_SCHEMA=$(cat mcp-schema/health-policy-management-mcp-schema.json | jq -c .)
 
 cat > /tmp/gateway-target-health-policy.json <<EOF
 {
@@ -138,7 +138,7 @@ echo "      ✓ HealthPolicyManagement 作成完了"
 # 3.4 ActivityManagement
 echo "   3.4 ActivityManagement..."
 
-ACTIVITY_MCP_SCHEMA=$(cat activity-management-mcp-schema.json | jq -c .)
+ACTIVITY_MCP_SCHEMA=$(cat mcp-schema/activity-management-mcp-schema.json | jq -c .)
 
 cat > /tmp/gateway-target-activity.json <<EOF
 {

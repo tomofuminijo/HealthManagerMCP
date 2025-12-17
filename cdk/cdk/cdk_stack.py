@@ -482,8 +482,6 @@ class HealthmateHealthManagerStack(Stack):
             action="lambda:InvokeFunction",
         )
 
-
-
         # ========================================
         # CloudFormation Outputs
         # ========================================
@@ -527,32 +525,6 @@ class HealthmateHealthManagerStack(Stack):
             value=f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
             description="AgentCore Gateway Endpoint",
             export_name="Healthmate-HealthManager-GatewayEndpoint"
-        )
-
-        CfnOutput(
-            self,
-            "Region",
-            value=self.region,
-            description="AWS Region",
-            export_name="Healthmate-HealthManager-Region"
-        )
-
-        CfnOutput(
-            self,
-            "AccountId",
-            value=self.account,
-            description="AWS Account ID",
-            export_name="Healthmate-HealthManager-AccountId"
-        )
-
-        # 中優先度（推奨）
-
-        CfnOutput(
-            self,
-            "GatewayName",
-            value="healthmate-gateway",
-            description="AgentCore Gateway Name",
-            export_name="Healthmate-HealthManager-GatewayName"
         )
 
         CfnOutput(
@@ -627,39 +599,6 @@ class HealthmateHealthManagerStack(Stack):
             value=self.activities_table.table_name,
             description="Activities DynamoDB Table Name",
             export_name="Healthmate-HealthManager-ActivitiesTableName"
-        )
-
-        # DynamoDBテーブルARN
-        CfnOutput(
-            self,
-            "UsersTableArn",
-            value=self.users_table.table_arn,
-            description="Users DynamoDB Table ARN",
-            export_name="Healthmate-HealthManager-UsersTableArn"
-        )
-
-        CfnOutput(
-            self,
-            "GoalsTableArn",
-            value=self.goals_table.table_arn,
-            description="Goals DynamoDB Table ARN",
-            export_name="Healthmate-HealthManager-GoalsTableArn"
-        )
-
-        CfnOutput(
-            self,
-            "PoliciesTableArn",
-            value=self.policies_table.table_arn,
-            description="Policies DynamoDB Table ARN",
-            export_name="Healthmate-HealthManager-PoliciesTableArn"
-        )
-
-        CfnOutput(
-            self,
-            "ActivitiesTableArn",
-            value=self.activities_table.table_arn,
-            description="Activities DynamoDB Table ARN",
-            export_name="Healthmate-HealthManager-ActivitiesTableArn"
         )
 
         # 低優先度（便利）
