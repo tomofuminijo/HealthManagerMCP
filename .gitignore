@@ -65,3 +65,13 @@ frontend/build/
 
 # Logs
 *.log
+
+# Test temporary files
+response.json
+test_*_payload.json
+
+# CDK generated files
+cdk/template.json
+
+# Hypothesis cache
+.hypothesis/
