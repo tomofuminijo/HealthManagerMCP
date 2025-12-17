@@ -14,6 +14,7 @@
 - 🤖 **AI連携**: ChatGPT、Claude、Gemini等の外部AIクライアントとの直接連携
 - 📊 **包括的な健康管理**: 目標設定から日々の活動記録まで一元管理
 - 🔧 **MCP準拠**: Model Context Protocolによる標準化されたAPI
+- 🏗️ **完全IaC**: CDKによる全リソースの一元管理（Gateway Targets含む）
 - ✅ **テスト完備**: 単体テスト + 統合テストによる品質保証
 
 ## 🏗️ Healthmateエコシステム
@@ -41,7 +42,7 @@ graph TB
 - **Database**: Amazon DynamoDB
 - **Authentication**: Amazon Cognito (OAuth 2.0)
 - **API Gateway**: Amazon Bedrock AgentCore Gateway
-- **Infrastructure**: AWS CDK (Python)
+- **Infrastructure**: AWS CDK (Python) - 完全なInfrastructure as Code
 - **Testing**: pytest + hypothesis (Property-Based Testing)
 - **Protocol**: Model Context Protocol (MCP)
 
@@ -111,6 +112,8 @@ sequenceDiagram
 - AWS CLI v2 (設定済み)
 - AWS CDK Bootstrap (us-west-2リージョン)
 
+> **注意**: 2024年12月のリファクタリングにより、Gateway TargetsもCDKで管理されるようになりました。手動スクリプトは不要です。
+
 ### インストール
 
 ```bash
@@ -132,22 +135,15 @@ cd cdk && npm install && cd ..
 ### デプロイ
 
 ```bash
-# CDKスタックをデプロイ
+# CDKスタックをデプロイ（Gateway + Gateway Targets含む）
 cd cdk
 cdk deploy --require-approval never
-
-# Gateway Targetsを作成
-cd ..
-./create-gateway-targets.sh
 ```
 
 ### アンデプロイ
 
 ```bash
-# Gateway Targetsを削除
-./delete-gateway-targets.sh
-
-# CDKスタックを削除
+# CDKスタックを削除（全リソース削除）
 cd cdk
 cdk destroy
 ```
@@ -189,8 +185,7 @@ Healthmate-HealthManager/
 │       ├── requirements.md      # システム要件
 │       ├── design.md           # アーキテクチャ設計
 │       └── tasks.md            # 実装タスク
-├── create-gateway-targets.sh   # Gateway セットアップスクリプト
-├── delete-gateway-targets.sh   # Gateway クリーンアップスクリプト
+
 ├── test_mcp_client.py          # 統合テストクライアント
 ├── requirements.txt            # Python 依存関係
 ├── pytest.ini                 # テスト設定
@@ -262,7 +257,8 @@ client = anthropic.Anthropic(
 | ✅ Phase 5 | 完了 | デプロイと動作確認 |
 | ✅ Phase 6 | 完了 | テスト実装 |
 | ✅ Phase 7 | 完了 | ドキュメント整備 |
-| 🔄 Phase 8 | 進行中 | 本番環境への移行 |
+| ✅ Phase 8 | 完了 | CDK統合リファクタリング（Gateway Targets統合） |
+| 🔄 Phase 9 | 進行中 | 本番環境への移行 |
 
 ## 🤝 コントリビューション
 

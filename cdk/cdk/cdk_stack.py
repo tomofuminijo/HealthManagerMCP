@@ -2,18 +2,19 @@ from aws_cdk import (
     Stack,
     RemovalPolicy,
     Duration,
-    CfnResource,
     CfnOutput,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_iam as iam,
-    aws_bedrock as bedrock,
     aws_logs as logs,
     aws_cognito as cognito,
 )
 from constructs import Construct
 import os
 import json
+
+# AgentCore パッケージをインポート（正式版）
+from aws_cdk import aws_bedrockagentcore as bedrockagentcore
 
 
 class HealthmateHealthManagerStack(Stack):
@@ -426,38 +427,148 @@ class HealthmateHealthManagerStack(Stack):
         # Cognito User PoolのDiscovery URL（OIDC設定）
         discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool.user_pool_id}/.well-known/openid-configuration"
         
-        # AgentCore Gateway
-        # NOTE: Gateway TargetsはCDKでサポートされていないため、CLIで設定する
-        self.agentcore_gateway = CfnResource(
+        # AgentCore Gateway（L1コンストラクト使用）
+        self.agentcore_gateway = bedrockagentcore.CfnGateway(
             self,
             "AgentCoreGateway",
-            type="AWS::BedrockAgentCore::Gateway",
-            properties={
-                "Name": "healthmate-gateway",
-                "Description": "HealthManagerMCP Gateway for Healthmate ecosystem integration",
-                "ProtocolType": "MCP",
-                "RoleArn": gateway_role.role_arn,
-                "AuthorizerType": "CUSTOM_JWT",
-                "AuthorizerConfiguration": {
-                    "CustomJWTAuthorizer": {
-                        "DiscoveryUrl": discovery_url,
-                        "AllowedClients": [
-                            self.user_pool_client.user_pool_client_id
-                        ],
-                    }
-                },
-            },
+            name="healthmate-gateway",
+            description="HealthManagerMCP Gateway for Healthmate ecosystem integration",
+            protocol_type="MCP",
+            role_arn=gateway_role.role_arn,
+            authorizer_type="CUSTOM_JWT",
+            authorizer_configuration=bedrockagentcore.CfnGateway.AuthorizerConfigurationProperty(
+                custom_jwt_authorizer=bedrockagentcore.CfnGateway.CustomJWTAuthorizerConfigurationProperty(
+                    discovery_url=discovery_url,
+                    allowed_clients=[self.user_pool_client.user_pool_client_id]
+                )
+            )
         )
         
-        # Gateway Targetの作成
-        # NOTE: Gateway TargetはCloudFormationでの作成が複雑なため、
-        # CDKデプロイ後にcreate-gateway-targets.shスクリプトで作成する
+        # ========================================
+        # Gateway Targets作成
+        # ========================================
+        
+        # MCPスキーマファイルのパス
+        mcp_schema_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "mcp-schema"
+        )
+        
+        # MCPスキーマファイルを読み込む関数
+        def load_mcp_schema(schema_file_name: str) -> dict:
+            schema_file_path = os.path.join(mcp_schema_path, schema_file_name)
+            with open(schema_file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        
+        # UserManagement Target
+        user_mcp_schema = load_mcp_schema("user-management-mcp-schema.json")
+        
+        self.user_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "UserManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="UserManagement",
+            description="ユーザー情報を管理する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.user_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=user_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
+        
+        # HealthGoalManagement Target
+        health_goal_mcp_schema = load_mcp_schema("health-goal-management-mcp-schema.json")
+        
+        self.health_goal_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "HealthGoalManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="HealthGoalManagement",
+            description="ユーザーの健康目標（長期的な理想状態）を管理する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.health_goal_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=health_goal_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
+        
+        # HealthPolicyManagement Target
+        health_policy_mcp_schema = load_mcp_schema("health-policy-management-mcp-schema.json")
+        
+        self.health_policy_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "HealthPolicyManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="HealthPolicyManagement",
+            description="ユーザーの健康ポリシー（具体的な行動ルール）を管理する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.health_policy_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=health_policy_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
+        
+        # ActivityManagement Target
+        activity_mcp_schema = load_mcp_schema("activity-management-mcp-schema.json")
+        
+        self.activity_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "ActivityManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="ActivityManagement",
+            description="ユーザーの日々の健康活動を記録・取得する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.activity_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=activity_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
 
         # ========================================
         # Lambda Permissions
         # ========================================
         
         # Lambda関数にAgentCore Gatewayからの呼び出し権限を付与
+        # L1コンストラクトでは自動設定されないため手動で設定
         self.user_lambda.add_permission(
             "AllowAgentCoreGatewayInvoke",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
