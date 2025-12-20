@@ -3,11 +3,13 @@ from aws_cdk import (
     RemovalPolicy,
     Duration,
     CfnOutput,
+    SecretValue,
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_iam as iam,
     aws_logs as logs,
     aws_cognito as cognito,
+    aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
 import os
