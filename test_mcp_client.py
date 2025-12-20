@@ -7,7 +7,14 @@ HealthManagerMCP テスト用MCPクライアント（M2M認証版）
 
 1. Cognito User PoolからClient Credentials Flowでアクセストークンを取得
 2. AgentCore GatewayにM2M認証でMCP接続
-3. 各Gateway Targetの動作確認
+3. 各Gateway Targetの動作確認（全23ツール）
+
+テスト対象ツール:
+- UserManagement (3ツール): AddUser, UpdateUser, GetUser
+- HealthGoalManagement (4ツール): AddGoal, UpdateGoal, DeleteGoal, GetGoals
+- HealthPolicyManagement (4ツール): AddPolicy, UpdatePolicy, DeletePolicy, GetPolicies
+- ActivityManagement (6ツール): AddActivities, UpdateActivity, UpdateActivities, DeleteActivity, GetActivities, GetActivitiesInRange
+- BodyMeasurementManagement (6ツール): AddBodyMeasurement, UpdateBodyMeasurement, DeleteBodyMeasurement, GetLatestMeasurements, GetOldestMeasurements, GetMeasurementHistory
 
 使用方法:
     python test_mcp_client.py
@@ -244,8 +251,8 @@ class HealthManagerMCPTestClient:
             return False
     
     def test_mcp_tools(self) -> bool:
-        """実際のMCPツールを呼び出してテスト（全17ツール）"""
-        print("🧪 MCP ツール呼び出しテスト中（全17ツール）...")
+        """実際のMCPツールを呼び出してテスト（全23ツール）"""
+        print("🧪 MCP ツール呼び出しテスト中（全23ツール）...")
         
         if not self.gateway_endpoint or not self.access_token:
             print("❌ Gateway EndpointまたはAccess Tokenが設定されていません")
@@ -962,13 +969,452 @@ class HealthManagerMCPTestClient:
             print(f"❌ DeleteActivity例外: {str(e)}")
             success = False
         
-        print(f"\n🏁 全17ツールのテスト完了")
+        # === BodyMeasurementManagement ツール (6個) ===
+        
+        # 複数の測定記録を作成してLatest/Oldest処理をテスト
+        test_measurement_ids = []
+        
+        # テスト18: BodyMeasurementManagement.AddBodyMeasurement (複数記録)
+        print("\n--- 18. BodyMeasurementManagement.AddBodyMeasurement テスト ---")
+        try:
+            # 1回目の記録（最古になる予定）- 2時間前
+            time_1 = (datetime.now() - timedelta(hours=2)).isoformat()
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "BodyMeasurementManagement___AddBodyMeasurement",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "weight": 65.0,
+                        "height": 170.0,
+                        "body_fat_percentage": 15.0,
+                        "measurement_time": time_1
+                    }
+                },
+                "id": 18
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ AddBodyMeasurement(1回目)失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddBodyMeasurement(1回目)成功")
+                    # measurement_idを保存
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'measurementId' in parsed_content:
+                                        test_measurement_ids.append(parsed_content['measurementId'])
+                                        print(f"   保存されたmeasurement_id: {parsed_content['measurementId']}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ AddBodyMeasurement(1回目)失敗: HTTP {response.status_code}")
+                success = False
+            
+            # 2回目の記録（中間）- 1時間前
+            time_2 = (datetime.now() - timedelta(hours=1)).isoformat()
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "BodyMeasurementManagement___AddBodyMeasurement",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "weight": 66.0,
+                        "height": 171.0,
+                        "body_fat_percentage": 16.0,
+                        "measurement_time": time_2
+                    }
+                },
+                "id": 18
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ AddBodyMeasurement(2回目)失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddBodyMeasurement(2回目)成功")
+                    # measurement_idを保存
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'measurementId' in parsed_content:
+                                        test_measurement_ids.append(parsed_content['measurementId'])
+                                        print(f"   保存されたmeasurement_id: {parsed_content['measurementId']}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ AddBodyMeasurement(2回目)失敗: HTTP {response.status_code}")
+                success = False
+            
+            # 3回目の記録（最新になる予定）- 現在時刻
+            time_3 = datetime.now().isoformat()
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "BodyMeasurementManagement___AddBodyMeasurement",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "weight": 67.0,
+                        "height": 172.0,
+                        "body_fat_percentage": 17.0,
+                        "measurement_time": time_3
+                    }
+                },
+                "id": 18
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ AddBodyMeasurement(3回目)失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddBodyMeasurement(3回目)成功")
+                    # measurement_idを保存
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'measurementId' in parsed_content:
+                                        test_measurement_ids.append(parsed_content['measurementId'])
+                                        print(f"   保存されたmeasurement_id: {parsed_content['measurementId']}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ AddBodyMeasurement(3回目)失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ AddBodyMeasurement例外: {str(e)}")
+            success = False
+        
+        # テスト19: BodyMeasurementManagement.GetLatestMeasurements
+        print("\n--- 19. BodyMeasurementManagement.GetLatestMeasurements テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "BodyMeasurementManagement___GetLatestMeasurements",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 19
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetLatestMeasurements失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetLatestMeasurements成功")
+                    # 最新値が67.0であることを確認
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    measurements = parsed_content.get('measurements', {})
+                                    latest_weight = measurements.get('weight')
+                                    if latest_weight == 67.0:
+                                        print(f"   ✅ 最新体重確認: {latest_weight}kg")
+                                    else:
+                                        print(f"   ⚠️ 最新体重が期待値と異なります: 期待67.0kg, 実際{latest_weight}kg")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetLatestMeasurements失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetLatestMeasurements例外: {str(e)}")
+            success = False
+        
+        # テスト20: BodyMeasurementManagement.GetOldestMeasurements
+        print("\n--- 20. BodyMeasurementManagement.GetOldestMeasurements テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "BodyMeasurementManagement___GetOldestMeasurements",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 20
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetOldestMeasurements失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetOldestMeasurements成功")
+                    # 最古値が65.0であることを確認
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    measurements = parsed_content.get('measurements', {})
+                                    oldest_weight = measurements.get('weight')
+                                    if oldest_weight == 65.0:
+                                        print(f"   ✅ 最古体重確認: {oldest_weight}kg")
+                                    else:
+                                        print(f"   ⚠️ 最古体重が期待値と異なります: 期待65.0kg, 実際{oldest_weight}kg")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetOldestMeasurements失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetOldestMeasurements例外: {str(e)}")
+            success = False
+        
+        # テスト21: BodyMeasurementManagement.GetMeasurementHistory
+        print("\n--- 21. BodyMeasurementManagement.GetMeasurementHistory テスト ---")
+        try:
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "BodyMeasurementManagement___GetMeasurementHistory",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "start_date": yesterday,
+                        "end_date": today,
+                        "limit": 10
+                    }
+                },
+                "id": 21
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetMeasurementHistory失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetMeasurementHistory成功")
+                    # 3件の記録があることを確認
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    measurements = parsed_content.get('measurements', [])
+                                    count = parsed_content.get('count', 0)
+                                    if count >= 3:
+                                        print(f"   ✅ 測定記録数確認: {count}件")
+                                    else:
+                                        print(f"   ⚠️ 測定記録数が期待値より少ないです: 期待3件以上, 実際{count}件")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetMeasurementHistory失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetMeasurementHistory例外: {str(e)}")
+            success = False
+        
+        # テスト22: BodyMeasurementManagement.UpdateBodyMeasurement
+        print("\n--- 22. BodyMeasurementManagement.UpdateBodyMeasurement テスト ---")
+        try:
+            if len(test_measurement_ids) >= 3:
+                # 最新の記録（3回目）を更新
+                latest_measurement_id = test_measurement_ids[2]
+                
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "BodyMeasurementManagement___UpdateBodyMeasurement",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "measurement_id": latest_measurement_id,
+                            "weight": 68.5  # 67.0から68.5に更新
+                        }
+                    },
+                    "id": 22
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ UpdateBodyMeasurement失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ UpdateBodyMeasurement成功")
+                        
+                        # 最新値が更新されていることを確認
+                        latest_request = {
+                            "jsonrpc": "2.0",
+                            "method": "tools/call",
+                            "params": {
+                                "name": "BodyMeasurementManagement___GetLatestMeasurements",
+                                "arguments": {
+                                    "userId": self.user_id
+                                }
+                            },
+                            "id": 22
+                        }
+                        
+                        latest_response = requests.post(mcp_endpoint, headers=headers, json=latest_request, timeout=30)
+                        
+                        if latest_response.status_code == 200:
+                            latest_result = latest_response.json()
+                            if 'result' in latest_result and 'content' in latest_result['result']:
+                                content = latest_result['result']['content']
+                                if content and isinstance(content, list) and len(content) > 0:
+                                    text_content = content[0].get('text', '')
+                                    if text_content:
+                                        try:
+                                            parsed_content = json.loads(text_content)
+                                            measurements = parsed_content.get('measurements', {})
+                                            updated_weight = measurements.get('weight')
+                                            if updated_weight == 68.5:
+                                                print(f"   ✅ Latest値更新確認: {updated_weight}kg")
+                                            else:
+                                                print(f"   ❌ Latest値が更新されていません: 期待68.5kg, 実際{updated_weight}kg")
+                                                success = False
+                                        except json.JSONDecodeError:
+                                            pass
+                else:
+                    print(f"❌ UpdateBodyMeasurement失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ UpdateBodyMeasurement スキップ: measurement_idが不足しています")
+                
+        except Exception as e:
+            print(f"❌ UpdateBodyMeasurement例外: {str(e)}")
+            success = False
+        
+        # テスト23: BodyMeasurementManagement.DeleteBodyMeasurement
+        print("\n--- 23. BodyMeasurementManagement.DeleteBodyMeasurement テスト ---")
+        try:
+            if len(test_measurement_ids) >= 3:
+                # 最古の記録（1回目）を削除
+                oldest_measurement_id = test_measurement_ids[0]
+                
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "BodyMeasurementManagement___DeleteBodyMeasurement",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "measurement_id": oldest_measurement_id
+                        }
+                    },
+                    "id": 23
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ DeleteBodyMeasurement失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ DeleteBodyMeasurement成功")
+                        
+                        # 最古値が更新されていることを確認（2回目の記録が新しい最古になる）
+                        oldest_request = {
+                            "jsonrpc": "2.0",
+                            "method": "tools/call",
+                            "params": {
+                                "name": "BodyMeasurementManagement___GetOldestMeasurements",
+                                "arguments": {
+                                    "userId": self.user_id
+                                }
+                            },
+                            "id": 23
+                        }
+                        
+                        oldest_response = requests.post(mcp_endpoint, headers=headers, json=oldest_request, timeout=30)
+                        
+                        if oldest_response.status_code == 200:
+                            oldest_result = oldest_response.json()
+                            if 'result' in oldest_result and 'content' in oldest_result['result']:
+                                content = oldest_result['result']['content']
+                                if content and isinstance(content, list) and len(content) > 0:
+                                    text_content = content[0].get('text', '')
+                                    if text_content:
+                                        try:
+                                            parsed_content = json.loads(text_content)
+                                            measurements = parsed_content.get('measurements', {})
+                                            new_oldest_weight = measurements.get('weight')
+                                            if new_oldest_weight == 66.0:  # 2回目の記録が新しい最古
+                                                print(f"   ✅ Oldest値更新確認: {new_oldest_weight}kg")
+                                            else:
+                                                print(f"   ❌ Oldest値が正しく更新されていません: 期待66.0kg, 実際{new_oldest_weight}kg")
+                                                success = False
+                                        except json.JSONDecodeError:
+                                            pass
+                else:
+                    print(f"❌ DeleteBodyMeasurement失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ DeleteBodyMeasurement スキップ: measurement_idが不足しています")
+                
+        except Exception as e:
+            print(f"❌ DeleteBodyMeasurement例外: {str(e)}")
+            success = False
+        
+        print(f"\n🏁 全23ツールのテスト完了")
         return success
     
 
     def run_tests(self) -> bool:
         """全テストを実行（M2M認証版）"""
-        print("🚀 HealthManagerMCP M2M認証テスト開始（全17ツール）")
+        print("🚀 HealthManagerMCP M2M認証テスト開始（全23ツール）")
         print("=" * 60)
         
         success = True
@@ -981,13 +1427,13 @@ class HealthManagerMCPTestClient:
         if not self.test_mcp_connection():
             success = False
         
-        # 3. MCPツール呼び出しテスト（全17ツール）
+        # 3. MCPツール呼び出しテスト（全23ツール）
         if not self.test_mcp_tools():
             success = False
         
         print("=" * 60)
         if success:
-            print("✅ 全M2M認証テスト完了（17ツール全て成功）")
+            print("✅ 全M2M認証テスト完了（23ツール全て成功）")
         else:
             print("⚠️  一部テストで問題が発生しました")
         

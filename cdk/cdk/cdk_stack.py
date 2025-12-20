@@ -375,6 +375,61 @@ class HealthmateHealthManagerStack(Stack):
         # ActivityLambdaにDynamoDBテーブルへのアクセス権限を付与
         self.activities_table.grant_read_write_data(self.activity_lambda)
 
+        # 身体測定テーブル
+        self.body_measurements_table = dynamodb.Table(
+            self,
+            "BodyMeasurementsTable",
+            table_name="healthmate-body-measurements",
+            partition_key=dynamodb.Attribute(
+                name="PK", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="SK", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,  # 開発用：本番環境ではRETAINに変更
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True
+            ),
+        )
+
+        # LSI: RecordTypeIndex (Latest/Oldest レコード用)
+        self.body_measurements_table.add_local_secondary_index(
+            index_name="RecordTypeIndex",
+            sort_key=dynamodb.Attribute(
+                name="record_type", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
+        # BodyMeasurementLambda用のCloudWatch Logsロググループ
+        body_measurement_log_group = logs.LogGroup(
+            self,
+            "BodyMeasurementLambdaLogGroup",
+            log_group_name="/aws/lambda/healthmanagermcp-body-measurement",
+            retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
+            removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
+        )
+
+        # BodyMeasurementLambda関数
+        self.body_measurement_lambda = lambda_.Function(
+            self,
+            "BodyMeasurementLambda",
+            function_name="healthmanagermcp-body-measurement",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="body_measurement.handler.lambda_handler",
+            code=lambda_.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            environment={
+                "BODY_MEASUREMENTS_TABLE_NAME": self.body_measurements_table.table_name,
+            },
+            log_group=body_measurement_log_group,  # ロググループを明示的に指定
+        )
+
+        # BodyMeasurementLambdaにDynamoDBテーブルへのアクセス権限を付与
+        self.body_measurements_table.grant_read_write_data(self.body_measurement_lambda)
+
 
 
         # ========================================
@@ -409,6 +464,7 @@ class HealthmateHealthManagerStack(Stack):
                     self.health_goal_lambda.function_arn,
                     self.health_policy_lambda.function_arn,
                     self.activity_lambda.function_arn,
+                    self.body_measurement_lambda.function_arn,
                 ],
             )
         )
@@ -563,6 +619,32 @@ class HealthmateHealthManagerStack(Stack):
             )
         )
 
+        # BodyMeasurementManagement Target
+        body_measurement_mcp_schema = load_mcp_schema("body-measurement-mcp-schema.json")
+        
+        self.body_measurement_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "BodyMeasurementManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="BodyMeasurementManagement",
+            description="ユーザーの身体測定値（体重、身長、体脂肪率）を記録・管理する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.body_measurement_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=body_measurement_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
+
         # ========================================
         # Lambda Permissions
         # ========================================
@@ -588,6 +670,12 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         self.activity_lambda.add_permission(
+            "AllowAgentCoreGatewayInvoke",
+            principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            action="lambda:InvokeFunction",
+        )
+
+        self.body_measurement_lambda.add_permission(
             "AllowAgentCoreGatewayInvoke",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
             action="lambda:InvokeFunction",
@@ -708,6 +796,14 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-ActivityLambdaArn"
         )
 
+        CfnOutput(
+            self,
+            "BodyMeasurementLambdaArn",
+            value=self.body_measurement_lambda.function_arn,
+            description="Body Measurement Lambda Function ARN",
+            export_name="Healthmate-HealthManager-BodyMeasurementLambdaArn"
+        )
+
         # DynamoDBテーブル名
         CfnOutput(
             self,
@@ -739,6 +835,14 @@ class HealthmateHealthManagerStack(Stack):
             value=self.activities_table.table_name,
             description="Activities DynamoDB Table Name",
             export_name="Healthmate-HealthManager-ActivitiesTableName"
+        )
+
+        CfnOutput(
+            self,
+            "BodyMeasurementsTableName",
+            value=self.body_measurements_table.table_name,
+            description="Body Measurements DynamoDB Table Name",
+            export_name="Healthmate-HealthManager-BodyMeasurementsTableName"
         )
 
         # M2M認証用のJWKS URL

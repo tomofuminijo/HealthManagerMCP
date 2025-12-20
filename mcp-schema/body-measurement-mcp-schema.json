@@ -1,0 +1,152 @@
+[
+  {
+    "name": "AddBodyMeasurement",
+    "description": "身体測定値を記録する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "weight": {
+          "type": "number",
+          "description": "体重(kg)",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "height": {
+          "type": "number", 
+          "description": "身長(cm)",
+          "minimum": 50,
+          "maximum": 300
+        },
+        "body_fat_percentage": {
+          "type": "number",
+          "description": "体脂肪率(%)",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "measurement_time": {
+          "type": "string",
+          "description": "測定時刻(ISO format)",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId"]
+    }
+  },
+  {
+    "name": "UpdateBodyMeasurement",
+    "description": "既存の測定記録を更新する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "measurement_id": {
+          "type": "string",
+          "description": "測定記録ID(timestamp)"
+        },
+        "weight": {
+          "type": "number",
+          "description": "体重(kg)",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "height": {
+          "type": "number",
+          "description": "身長(cm)",
+          "minimum": 50,
+          "maximum": 300
+        },
+        "body_fat_percentage": {
+          "type": "number",
+          "description": "体脂肪率(%)",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": ["userId", "measurement_id"]
+    }
+  },
+  {
+    "name": "DeleteBodyMeasurement",
+    "description": "測定記録を削除する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "measurement_id": {
+          "type": "string",
+          "description": "測定記録ID(timestamp)"
+        }
+      },
+      "required": ["userId", "measurement_id"]
+    }
+  },
+  {
+    "name": "GetLatestMeasurements",
+    "description": "最新の測定値を取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        }
+      },
+      "required": ["userId"]
+    }
+  },
+  {
+    "name": "GetOldestMeasurements",
+    "description": "最古の測定値を取得する", 
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        }
+      },
+      "required": ["userId"]
+    }
+  },
+  {
+    "name": "GetMeasurementHistory",
+    "description": "指定期間の測定履歴を取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "start_date": {
+          "type": "string",
+          "description": "開始日(YYYY-MM-DD)",
+          "format": "date"
+        },
+        "end_date": {
+          "type": "string", 
+          "description": "終了日(YYYY-MM-DD)",
+          "format": "date"
+        },
+        "limit": {
+          "type": "number",
+          "description": "取得件数上限",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "required": ["userId", "start_date", "end_date"]
+    }
+  }
+]

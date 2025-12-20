@@ -52,35 +52,44 @@ graph TB
 - **健康目標管理**: 長期的な健康目標（100歳まで健康寿命、アスリート体型など）の管理
 - **健康ポリシー管理**: 具体的な行動ルール（ローカーボダイエット、16時間ファスティングなど）の管理
 - **活動記録管理**: 日々の健康活動（体重、食事、運動、気分など）の記録と取得
+- **身体測定値管理**: 体重、身長、体脂肪率の記録と履歴管理（Latest/Oldest自動管理）
 
 ## MCPツール
 
-Healthmate-HealthManagerは以下のMCPツールを提供します：
+Healthmate-HealthManagerは以下の23個のMCPツールを提供します：
 
-### UserManagement
-- `addUser`: 新しいユーザー情報を作成
-- `updateUser`: ユーザー情報を更新
-- `getUser`: ユーザー情報を取得
+### UserManagement (3ツール)
+- `AddUser`: 新しいユーザー情報を作成
+- `UpdateUser`: ユーザー情報を更新
+- `GetUser`: ユーザー情報を取得
 
-### HealthGoalManagement
-- `addGoal`: 新しい健康目標を追加
-- `updateGoal`: 既存の健康目標を更新
-- `deleteGoal`: 健康目標を削除
-- `getGoals`: ユーザーのすべての健康目標を取得
+### HealthGoalManagement (4ツール)
+- `AddGoal`: 新しい健康目標を追加
+- `UpdateGoal`: 既存の健康目標を更新
+- `DeleteGoal`: 健康目標を削除
+- `GetGoals`: ユーザーのすべての健康目標を取得
 
-### HealthPolicyManagement
-- `addPolicy`: 新しい健康ポリシーを追加
-- `updatePolicy`: 既存の健康ポリシーを更新
-- `deletePolicy`: 健康ポリシーを削除
-- `getPolicies`: ユーザーのすべての健康ポリシーを取得
+### HealthPolicyManagement (4ツール)
+- `AddPolicy`: 新しい健康ポリシーを追加
+- `UpdatePolicy`: 既存の健康ポリシーを更新
+- `DeletePolicy`: 健康ポリシーを削除
+- `GetPolicies`: ユーザーのすべての健康ポリシーを取得
 
-### ActivityManagement
-- `addActivities`: 指定した日に新しい活動を追加
-- `updateActivity`: 特定の時刻の活動を部分的に更新
-- `updateActivities`: 指定した日の全活動を置き換え
-- `deleteActivity`: 特定の活動を削除
-- `getActivities`: 指定した日の活動を取得
-- `getActivitiesInRange`: 指定した期間の活動履歴を取得
+### ActivityManagement (6ツール)
+- `AddActivities`: 指定した日に新しい活動を追加
+- `UpdateActivity`: 特定の時刻の活動を部分的に更新
+- `UpdateActivities`: 指定した日の全活動を置き換え
+- `DeleteActivity`: 特定の活動を削除
+- `GetActivities`: 指定した日の活動を取得
+- `GetActivitiesInRange`: 指定した期間の活動履歴を取得
+
+### BodyMeasurementManagement (6ツール)
+- `AddBodyMeasurement`: 身体測定値（体重、身長、体脂肪率）を記録
+- `UpdateBodyMeasurement`: 既存の測定記録を更新
+- `DeleteBodyMeasurement`: 測定記録を削除
+- `GetLatestMeasurements`: 最新の測定値を取得
+- `GetOldestMeasurements`: 最古の測定値を取得
+- `GetMeasurementHistory`: 指定期間の測定履歴を取得
 
 ## 🏛️ アーキテクチャ
 
@@ -196,12 +205,14 @@ Healthmate-HealthManager/
 │   ├── user/handler.py          # ユーザー管理 Lambda
 │   ├── health_goal/handler.py   # 健康目標管理 Lambda
 │   ├── health_policy/handler.py # 健康ポリシー管理 Lambda
-│   └── activity/handler.py      # 活動記録管理 Lambda
+│   ├── activity/handler.py      # 活動記録管理 Lambda
+│   └── body_measurement/handler.py # 身体測定値管理 Lambda
 ├── mcp-schema/                  # MCP ツールスキーマ定義
 │   ├── user-management-mcp-schema.json
 │   ├── health-goal-management-mcp-schema.json
 │   ├── health-policy-management-mcp-schema.json
-│   └── activity-management-mcp-schema.json
+│   ├── activity-management-mcp-schema.json
+│   └── body-measurement-mcp-schema.json
 ├── scripts/                     # デプロイ・管理スクリプト
 │   ├── create-credential-provider.sh    # AgentCore Identity作成
 │   ├── delete-credential-provider.sh    # AgentCore Identity削除
@@ -211,9 +222,13 @@ Healthmate-HealthManager/
 │   ├── unit/                    # 単体テスト
 │   └── integration/             # 統合テスト
 ├── .kiro/specs/                 # 仕様書・設計書
-│   └── m2m-authentication-refactor/
-│       ├── requirements.md      # M2M認証要件
-│       ├── design.md           # M2M認証設計
+│   ├── m2m-authentication-refactor/
+│   │   ├── requirements.md      # M2M認証要件
+│   │   ├── design.md           # M2M認証設計
+│   │   └── tasks.md            # 実装タスク
+│   └── body-measurements/       # 身体測定値機能仕様
+│       ├── requirements.md      # 身体測定値要件
+│       ├── design.md           # 身体測定値設計
 │       └── tasks.md            # 実装タスク
 
 ├── test_mcp_client.py          # 統合テストクライアント
@@ -230,6 +245,9 @@ Healthmate-HealthManager/
 - **[M2M認証要件](.kiro/specs/m2m-authentication-refactor/requirements.md)**: M2M認証システム要件の詳細
 - **[M2M認証設計](.kiro/specs/m2m-authentication-refactor/design.md)**: M2M認証アーキテクチャと設計決定
 - **[実装タスク](.kiro/specs/m2m-authentication-refactor/tasks.md)**: M2M認証リファクタリングの開発進捗と実装計画
+- **[身体測定値要件](.kiro/specs/body-measurements/requirements.md)**: 身体測定値記録機能の要件定義
+- **[身体測定値設計](.kiro/specs/body-measurements/design.md)**: 身体測定値管理システムの設計仕様
+- **[身体測定値タスク](.kiro/specs/body-measurements/tasks.md)**: 身体測定値機能の実装進捗
 
 ## 🔐 M2M認証システム
 
@@ -284,10 +302,11 @@ python test_mcp_client.py
 ```
 
 ### テストカバレッジ
-- **Lambda関数**: 64テストケース
-- **MCPスキーマ準拠**: 全ActivityType検証済み
+- **Lambda関数**: 全23ツールの完全テスト
+- **MCPスキーマ準拠**: 全ActivityType + BodyMeasurement検証済み
 - **認証フロー**: Cognito OAuth 2.0完全テスト
 - **CRUD操作**: 全データモデル検証済み
+- **身体測定値**: Latest/Oldest自動管理機能テスト済み
 
 ## 🤝 AI クライアント連携
 
@@ -329,7 +348,8 @@ client = anthropic.Anthropic(
 | ✅ Phase 7 | 完了 | ドキュメント整備 |
 | ✅ Phase 8 | 完了 | CDK統合リファクタリング（Gateway Targets統合） |
 | ✅ Phase 9 | 完了 | M2M認証リファクタリング（AgentCore専用認証） |
-| 🔄 Phase 10 | 進行中 | 本番環境への移行 |
+| ✅ Phase 10 | 完了 | 身体測定値記録機能（Latest/Oldest自動管理） |
+| 🔄 Phase 11 | 進行中 | 本番環境への移行 |
 
 ## 🤝 コントリビューション
 
