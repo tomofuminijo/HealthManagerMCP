@@ -627,6 +627,15 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-IdentitySecretArn"
         )
 
+        # ARN形式検証用の出力（AgentCore Identity用）
+        CfnOutput(
+            self,
+            "IdentitySecretName",
+            value=self.client_secret.secret_name,
+            description="Secrets Manager secret name for AgentCore Identity configuration",
+            export_name="Healthmate-HealthManager-IdentitySecretName"
+        )
+
         # M2M認証では直接トークンエンドポイントを使用
         CfnOutput(
             self,
@@ -752,6 +761,7 @@ class HealthmateHealthManagerStack(Stack):
                 "userPoolId": self.gateway_user_pool.user_pool_id,
                 "clientId": self.gateway_app_client.user_pool_client_id,
                 "identitySecretArn": self.client_secret.secret_full_arn,
+                "identitySecretName": self.client_secret.secret_name,
                 "discoveryUrl": discovery_url,
                 "jwksUrl": f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json",
                 "customScope": "HealthManager/HealthTarget:invoke"
