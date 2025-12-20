@@ -6,8 +6,8 @@
   - AWS Secrets Manager CDKモジュールのインポート追加
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 2. M2M認証用Cognito User Poolの実装
-- [ ] 2.1 既存User Pool設定の削除と新規作成
+- [-] 2. M2M認証用Cognito User Poolの実装
+- [-] 2.1 既存User Pool設定の削除と新規作成
   - 既存のユーザー認証用User Pool設定を削除
   - M2M認証専用のUser Pool設定を実装
   - セルフサインアップ無効化とユーザー名ベース認証の設定

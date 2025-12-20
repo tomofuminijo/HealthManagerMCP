@@ -154,35 +154,62 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         # ========================================
-        # Cognito User Pool（OAuth 2.0 IdP）
+        # Cognito User Pool（M2M Authentication）
         # ========================================
 
-        # Cognito User Pool
-        self.user_pool = cognito.UserPool(
+        # M2M認証専用のCognito User Pool
+        self.gateway_user_pool = cognito.UserPool(
             self,
-            "UserPool",
-            user_pool_name="healthmate-users",
-            # サインイン設定
-            sign_in_aliases=cognito.SignInAliases(
-                email=True,
-                username=True,
-            ),
-            # セルフサインアップを有効化
-            self_sign_up_enabled=True,
-            # ユーザー検証設定
-            auto_verify=cognito.AutoVerifiedAttrs(email=True),
-            # パスワードポリシー
+            "HealthManagerM2MUserPool",
+            user_pool_name="HealthManagerM2MUserPool",
+            # M2M認証設定
+            sign_in_aliases=cognito.SignInAliases(username=True),
+            # セルフサインアップを無効化（M2M認証のため）
+            self_sign_up_enabled=False,
+            # パスワードポリシー（管理者作成ユーザー用）
             password_policy=cognito.PasswordPolicy(
-                min_length=8,
+                min_length=12,
                 require_lowercase=True,
                 require_uppercase=True,
                 require_digits=True,
-                require_symbols=False,
+                require_symbols=True,
             ),
-            # アカウント復旧設定
+            # アカウント復旧設定（M2M用では不要だが設定）
             account_recovery=cognito.AccountRecovery.EMAIL_ONLY,
-            # 削除保護（開発用：本番環境ではTrueに変更）
+            # 削除保護（開発用：本番環境では適切に設定）
             removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        # M2M認証専用のApp Client（AgentCore Gateway用）
+        self.gateway_app_client = self.gateway_user_pool.add_client(
+            "HealthManagerM2MAppClient",
+            user_pool_client_name="AgentCoreGatewayClient",
+            # クライアントシークレット生成（M2Mフローに必須）
+            generate_secret=True,
+            # 認証フロー（クライアントクレデンシャルフローのみ）
+            auth_flows=cognito.AuthFlow(
+                # M2M認証では通常のユーザー認証フローは無効化
+                user_password=False,
+                user_srp=False,
+                custom=False,
+                # 管理者認証は保持（テスト用）
+                admin_user_password=True,
+            ),
+            # トークン有効期限（M2M用に調整）
+            access_token_validity=Duration.hours(1),
+            refresh_token_validity=Duration.days(30),
+            id_token_validity=Duration.hours(1),
+        )
+
+        # クライアントクレデンシャルフローを有効化（CloudFormationレベルで設定）
+        cfn_gateway_app_client = self.gateway_app_client.node.default_child
+        cfn_gateway_app_client.add_property_override(
+            "ExplicitAuthFlows",
+            [
+                "ALLOW_CLIENT_CREDENTIALS",  # M2M認証の核心
+                "ALLOW_ADMIN_USER_PASSWORD_AUTH",  # テスト用
+                "ALLOW_REFRESH_TOKEN_AUTH",  # トークン更新用
+            ]
         )
 
         # App Client（HealthCoachAI用）
@@ -427,7 +454,7 @@ class HealthmateHealthManagerStack(Stack):
         )
         
         # Cognito User PoolのDiscovery URL（OIDC設定）
-        discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool.user_pool_id}/.well-known/openid-configuration"
+        discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/openid-configuration"
         
         # AgentCore Gateway（L1コンストラクト使用）
         self.agentcore_gateway = bedrockagentcore.CfnGateway(
@@ -441,7 +468,7 @@ class HealthmateHealthManagerStack(Stack):
             authorizer_configuration=bedrockagentcore.CfnGateway.AuthorizerConfigurationProperty(
                 custom_jwt_authorizer=bedrockagentcore.CfnGateway.CustomJWTAuthorizerConfigurationProperty(
                     discovery_url=discovery_url,
-                    allowed_clients=[self.user_pool_client.user_pool_client_id]
+                    allowed_clients=[self.gateway_app_client.user_pool_client_id]
                 )
             )
         )
@@ -603,32 +630,25 @@ class HealthmateHealthManagerStack(Stack):
         CfnOutput(
             self,
             "UserPoolId",
-            value=self.user_pool.user_pool_id,
-            description="Cognito User Pool ID",
+            value=self.gateway_user_pool.user_pool_id,
+            description="M2M Cognito User Pool ID",
             export_name="Healthmate-HealthManager-UserPoolId"
         )
 
         CfnOutput(
             self,
             "UserPoolClientId", 
-            value=self.user_pool_client.user_pool_client_id,
-            description="Cognito User Pool Client ID",
+            value=self.gateway_app_client.user_pool_client_id,
+            description="M2M Cognito User Pool Client ID",
             export_name="Healthmate-HealthManager-UserPoolClientId"
         )
 
-        CfnOutput(
-            self,
-            "AuthorizationUrl",
-            value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/authorize",
-            description="OAuth 2.0 Authorization URL",
-            export_name="Healthmate-HealthManager-AuthorizationUrl"
-        )
-
+        # M2M認証では直接トークンエンドポイントを使用
         CfnOutput(
             self,
             "TokenUrl",
-            value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
-            description="OAuth 2.0 Token URL", 
+            value=f"https://cognito-idp.{self.region}.amazonaws.com/",
+            description="Cognito Identity Provider Base URL for M2M Token Exchange",
             export_name="Healthmate-HealthManager-TokenUrl"
         )
 
@@ -714,12 +734,12 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-ActivitiesTableName"
         )
 
-        # 低優先度（便利）
+        # M2M認証用のJWKS URL
         CfnOutput(
             self,
             "JwksUrl",
-            value=f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool.user_pool_id}/.well-known/jwks.json",
-            description="JWKS URL for JWT token verification",
+            value=f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json",
+            description="JWKS URL for M2M JWT token verification",
             export_name="Healthmate-HealthManager-JwksUrl"
         )
 
@@ -731,24 +751,15 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-DiscoveryUrl"
         )
 
-        CfnOutput(
-            self,
-            "UserInfoUrl",
-            value=f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/userInfo",
-            description="OAuth 2.0 UserInfo URL",
-            export_name="Healthmate-HealthManager-UserInfoUrl"
-        )
-
-        # MCP接続設定（JSON形式）
+        # M2M認証用のMCP接続設定（JSON形式）
         mcp_connection_config = {
             "gatewayEndpoint": f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
             "authConfig": {
-                "type": "oauth2",
-                "authorizationUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/authorize",
-                "tokenUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
-                "userInfoUrl": f"https://{self.user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/userInfo",
-                "clientId": self.user_pool_client.user_pool_client_id,
-                "scopes": ["openid", "profile", "email", "phone"]
+                "type": "m2m",
+                "userPoolId": self.gateway_user_pool.user_pool_id,
+                "clientId": self.gateway_app_client.user_pool_client_id,
+                "discoveryUrl": discovery_url,
+                "jwksUrl": f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json"
             },
             "tools": {
                 "userManagement": "UserManagement",
@@ -764,6 +775,6 @@ class HealthmateHealthManagerStack(Stack):
             self,
             "MCPConnectionConfig",
             value=json.dumps(mcp_connection_config, indent=2),
-            description="Complete MCP connection configuration (JSON)",
+            description="M2M MCP connection configuration (JSON)",
             export_name="Healthmate-HealthManager-MCPConnectionConfig"
         )
