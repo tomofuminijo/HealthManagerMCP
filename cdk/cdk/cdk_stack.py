@@ -180,12 +180,38 @@ class HealthmateHealthManagerStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        # AgentCore用のResource Serverとカスタムスコープを定義
+        self.gateway_resource_server = self.gateway_user_pool.add_resource_server(
+            "HealthManagerResourceServer",
+            identifier="HealthManager",
+            user_pool_resource_server_name="HealthManager MCP Resource Server",
+            scopes=[
+                cognito.ResourceServerScope(
+                    scope_name="HealthTarget:invoke",
+                    scope_description="Permission to invoke HealthTarget operations via MCP Gateway"
+                )
+            ]
+        )
+
         # M2M認証専用のApp Client（AgentCore Gateway用）
         self.gateway_app_client = self.gateway_user_pool.add_client(
             "HealthManagerM2MAppClient",
             user_pool_client_name="AgentCoreGatewayClient",
             # クライアントシークレット生成（M2Mフローに必須）
             generate_secret=True,
+            # OAuth設定（カスタムスコープ用）
+            o_auth=cognito.OAuthSettings(
+                flows=cognito.OAuthFlows(
+                    client_credentials=True,  # M2M認証フロー
+                ),
+                scopes=[
+                    # カスタムスコープ：HealthManager/HealthTarget:invoke
+                    cognito.OAuthScope.resource_server(
+                        self.gateway_resource_server, 
+                        self.gateway_resource_server.scopes[0]
+                    )
+                ]
+            ),
             # 認証フロー（クライアントクレデンシャルフローのみ）
             auth_flows=cognito.AuthFlow(
                 # M2M認証では通常のユーザー認証フローは無効化
@@ -682,6 +708,15 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-DiscoveryUrl"
         )
 
+        # カスタムOAuthスコープ
+        CfnOutput(
+            self,
+            "CustomScope",
+            value="HealthManager/HealthTarget:invoke",
+            description="Custom OAuth scope for AgentCore Gateway M2M authentication",
+            export_name="Healthmate-HealthManager-CustomScope"
+        )
+
         # M2M認証用のMCP接続設定（JSON形式）
         mcp_connection_config = {
             "gatewayEndpoint": f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
@@ -690,7 +725,8 @@ class HealthmateHealthManagerStack(Stack):
                 "userPoolId": self.gateway_user_pool.user_pool_id,
                 "clientId": self.gateway_app_client.user_pool_client_id,
                 "discoveryUrl": discovery_url,
-                "jwksUrl": f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json"
+                "jwksUrl": f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json",
+                "customScope": "HealthManager/HealthTarget:invoke"
             },
             "tools": {
                 "userManagement": "UserManagement",
