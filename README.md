@@ -134,18 +134,43 @@ cd cdk && npm install && cd ..
 
 ### デプロイ
 
+#### 方法1: 完全自動デプロイ（推奨）
+
 ```bash
-# CDKスタックをデプロイ（Gateway + Gateway Targets含む）
+# CDK + AgentCore Identity の完全デプロイ
+./scripts/deploy-full-stack.sh
+```
+
+#### 方法2: 手動ステップ実行
+
+```bash
+# Step 1: CDKスタックをデプロイ
 cd cdk
 cdk deploy --require-approval never
+
+# Step 2: AgentCore Identity (OAuth2 Credential Provider) を作成
+cd ..
+./scripts/create-credential-provider.sh
 ```
 
 ### アンデプロイ
 
+#### 方法1: 完全自動削除（推奨）
+
 ```bash
-# CDKスタックを削除（全リソース削除）
+# AgentCore Identity + CDK の完全削除
+./scripts/destroy-full-stack.sh
+```
+
+#### 方法2: 手動ステップ実行
+
+```bash
+# Step 1: AgentCore Identity (OAuth2 Credential Provider) を削除
+./scripts/delete-credential-provider.sh
+
+# Step 2: CDKスタックを削除
 cd cdk
-cdk destroy
+cdk destroy --force
 ```
 
 ### テスト実行
@@ -177,13 +202,18 @@ Healthmate-HealthManager/
 │   ├── health-goal-management-mcp-schema.json
 │   ├── health-policy-management-mcp-schema.json
 │   └── activity-management-mcp-schema.json
+├── scripts/                     # デプロイ・管理スクリプト
+│   ├── create-credential-provider.sh    # AgentCore Identity作成
+│   ├── delete-credential-provider.sh    # AgentCore Identity削除
+│   ├── deploy-full-stack.sh            # 完全デプロイ（CDK + Identity）
+│   └── destroy-full-stack.sh           # 完全削除（Identity + CDK）
 ├── tests/                       # テストスイート
 │   ├── unit/                    # 単体テスト
 │   └── integration/             # 統合テスト
 ├── .kiro/specs/                 # 仕様書・設計書
-│   └── healthmate-healthmanager/
-│       ├── requirements.md      # システム要件
-│       ├── design.md           # アーキテクチャ設計
+│   └── m2m-authentication-refactor/
+│       ├── requirements.md      # M2M認証要件
+│       ├── design.md           # M2M認証設計
 │       └── tasks.md            # 実装タスク
 
 ├── test_mcp_client.py          # 統合テストクライアント
@@ -197,9 +227,49 @@ Healthmate-HealthManager/
 ## 📖 ドキュメント
 
 - **[MCPスキーマ](mcp-schema/)**: 全MCPツールのAPI仕様（JSON Schema形式）
-- **[要件定義](.kiro/specs/healthmate-healthmanager/requirements.md)**: システム要件の詳細
-- **[設計書](.kiro/specs/healthmate-healthmanager/design.md)**: アーキテクチャと設計決定
-- **[実装タスク](.kiro/specs/healthmate-healthmanager/tasks.md)**: 開発進捗と実装計画
+- **[M2M認証要件](.kiro/specs/m2m-authentication-refactor/requirements.md)**: M2M認証システム要件の詳細
+- **[M2M認証設計](.kiro/specs/m2m-authentication-refactor/design.md)**: M2M認証アーキテクチャと設計決定
+- **[実装タスク](.kiro/specs/m2m-authentication-refactor/tasks.md)**: M2M認証リファクタリングの開発進捗と実装計画
+
+## 🔐 M2M認証システム
+
+2024年12月のリファクタリングにより、AgentCore Gateway専用のM2M（Machine-to-Machine）認証システムを実装しました。
+
+### 認証フロー
+
+```mermaid
+sequenceDiagram
+    participant Agent as AgentCore Runtime
+    participant Identity as AgentCore Identity
+    participant Cognito as Cognito User Pool
+    participant Gateway as AgentCore Gateway
+    participant Lambda as Lambda Functions
+
+    Agent->>Identity: Request OAuth2 Token
+    Identity->>Cognito: Client Credentials Flow
+    Cognito-->>Identity: JWT Access Token
+    Identity-->>Agent: JWT Token
+    Agent->>Gateway: MCP Request + JWT Token
+    Gateway->>Gateway: JWT Validation
+    Gateway->>Lambda: Invoke Function
+    Lambda-->>Gateway: Response
+    Gateway-->>Agent: MCP Response
+```
+
+### デプロイフロー
+
+1. **CDK Deploy**: Cognito User Pool、AgentCore Gateway、Lambda Functions等をデプロイ
+2. **AgentCore Identity**: OAuth2 Credential Providerを作成してM2M認証を設定
+3. **Runtime Configuration**: AgentCore RuntimeでWorkload Identityを使用
+
+### 管理スクリプト
+
+| スクリプト | 用途 | 説明 |
+|-----------|------|------|
+| `deploy-full-stack.sh` | 完全デプロイ | CDK + AgentCore Identity の一括デプロイ |
+| `destroy-full-stack.sh` | 完全削除 | AgentCore Identity + CDK の一括削除 |
+| `create-credential-provider.sh` | Identity作成 | OAuth2 Credential Provider単体作成 |
+| `delete-credential-provider.sh` | Identity削除 | OAuth2 Credential Provider単体削除 |
 
 ## 🧪 テスト
 
@@ -258,7 +328,8 @@ client = anthropic.Anthropic(
 | ✅ Phase 6 | 完了 | テスト実装 |
 | ✅ Phase 7 | 完了 | ドキュメント整備 |
 | ✅ Phase 8 | 完了 | CDK統合リファクタリング（Gateway Targets統合） |
-| 🔄 Phase 9 | 進行中 | 本番環境への移行 |
+| ✅ Phase 9 | 完了 | M2M認証リファクタリング（AgentCore専用認証） |
+| 🔄 Phase 10 | 進行中 | 本番環境への移行 |
 
 ## 🤝 コントリビューション
 

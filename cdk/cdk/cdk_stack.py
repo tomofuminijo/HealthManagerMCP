@@ -180,6 +180,14 @@ class HealthmateHealthManagerStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        # Cognito User Pool Domain（OAuth2 Token URL用）
+        self.gateway_user_pool_domain = self.gateway_user_pool.add_domain(
+            "HealthManagerM2MUserPoolDomain",
+            cognito_domain=cognito.CognitoDomainOptions(
+                domain_prefix="healthmanager-m2m-auth"
+            )
+        )
+
         # AgentCore用のResource Serverとカスタムスコープを定義
         health_target_scope = cognito.ResourceServerScope(
             scope_name="HealthTarget:invoke",
@@ -201,6 +209,9 @@ class HealthmateHealthManagerStack(Stack):
             generate_secret=True,
             # OAuth設定（カスタムスコープ用）
             o_auth=cognito.OAuthSettings(
+                flows=cognito.OAuthFlows(
+                    client_credentials=True  # Client Credentials Flowを有効化
+                ),
                 scopes=[
                     # カスタムスコープ：HealthManager/HealthTarget:invoke
                     cognito.OAuthScope.resource_server(
@@ -209,14 +220,13 @@ class HealthmateHealthManagerStack(Stack):
                     )
                 ]
             ),
-            # 認証フロー（クライアントクレデンシャルフローのみ）
+            # 認証フロー（M2M用に最小限に設定）
             auth_flows=cognito.AuthFlow(
                 # M2M認証では通常のユーザー認証フローは無効化
                 user_password=False,
                 user_srp=False,
                 custom=False,
-                # 管理者認証は保持（テスト用）
-                admin_user_password=True,
+                admin_user_password=False,  # M2M認証では不要
             ),
             # トークン有効期限（M2M用に調整）
             access_token_validity=Duration.hours(1),
@@ -224,52 +234,23 @@ class HealthmateHealthManagerStack(Stack):
             id_token_validity=Duration.hours(1),
         )
 
-        # クライアントクレデンシャルフローを有効化（CloudFormationレベルで設定）
-        cfn_gateway_app_client = self.gateway_app_client.node.default_child
-        cfn_gateway_app_client.add_property_override(
-            "ExplicitAuthFlows",
-            [
-                # M2M認証では標準的な認証フローを使用
-                "ALLOW_ADMIN_USER_PASSWORD_AUTH",  # 管理者認証（M2M用）
-                "ALLOW_REFRESH_TOKEN_AUTH",  # トークン更新用
-            ]
-        )
-
-        # ========================================
-        # Secrets Manager統合
-        # ========================================
-
-        # クライアントシークレットをSecrets Managerに保存
-        self.client_secret = secretsmanager.Secret(
-            self,
-            "HealthManagerM2MClientSecret",
-            secret_name=f"AgentCoreIdentitySecret/HealthManager/{self.stack_name}",
-            description="Client secret for AgentCore Gateway M2M authentication",
-            # CDK SecretValueメカニズムを使用してクライアントシークレットを安全に保存
-            secret_string_value=SecretValue.unsafe_plain_text(
-                self.gateway_app_client.user_pool_client_secret.unsafe_unwrap()
-            ),
-            # 環境別RemovalPolicy設定（開発環境用のDESTROY）
-            removal_policy=RemovalPolicy.DESTROY,  # 本番環境ではRETAINに変更
-        )
+        # CloudFormationレベルでの追加設定は不要（OAuth設定で十分）
 
         # ========================================
         # AgentCore Identity (Workload Identity)
         # ========================================
 
-        # TODO: AgentCore Identity - 現在のCDKバージョンでのパラメータを確認後に実装
-        # self.workload_identity = bedrockagentcore.CfnWorkloadIdentity(
-        #     self,
-        #     "HealthManagerWorkloadIdentity",
-        #     name="healthmanager-agentcore-identity",
-        #     # カスタムプロバイダー（Cognito）を指定
-        #     provider_type="CUSTOM",
-        #     # M2M認証設定
-        #     client_id=self.gateway_app_client.user_pool_client_id,
-        #     client_secret_arn=self.client_secret.secret_arn,
-        #     # CognitoのDiscovery URLを設定
-        #     discovery_url=f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/openid-configuration"
-        # )
+        # AgentCore Identity (Workload Identity) の生成
+        # RuntimeのエージェントがGatewayを呼び出す際の認証情報を定義
+        self.workload_identity = bedrockagentcore.CfnWorkloadIdentity(
+            self,
+            "HealthManagerWorkloadIdentity",
+            # Workload Identity名（エージェントコードで指定する名称）
+            name="healthmanager-agentcore-identity"
+        )
+
+        # 注意: OAuth2 Credential Providerは、AgentCore Identity APIを使用して
+        # シェルスクリプトで作成します。CDKでは直接作成できません。
 
 
 
@@ -633,33 +614,41 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-UserPoolClientId"
         )
 
-        # Secrets Manager ARN（AgentCore Identity用）
-        CfnOutput(
-            self,
-            "IdentitySecretArn",
-            value=self.client_secret.secret_full_arn,
-            description="Secrets Manager ARN for AgentCore Identity client secret access",
-            export_name="Healthmate-HealthManager-IdentitySecretArn"
-        )
-
-        # ARN形式検証用の出力（AgentCore Identity用）
-        CfnOutput(
-            self,
-            "IdentitySecretName",
-            value=self.client_secret.secret_name,
-            description="Secrets Manager secret name for AgentCore Identity configuration",
-            export_name="Healthmate-HealthManager-IdentitySecretName"
-        )
-
         # AgentCore Identity名（Runtime環境変数用）
-        # TODO: Workload Identity実装後に有効化
-        # CfnOutput(
-        #     self,
-        #     "WorkloadIdentityName",
-        #     value=self.workload_identity.name,
-        #     description="AgentCore Workload Identity name for Runtime agent authentication",
-        #     export_name="Healthmate-HealthManager-WorkloadIdentityName"
-        # )
+        CfnOutput(
+            self,
+            "WorkloadIdentityName",
+            value=self.workload_identity.name,
+            description="AgentCore Workload Identity name for Runtime agent authentication",
+            export_name="Healthmate-HealthManager-WorkloadIdentityName"
+        )
+
+        # Workload Identity ARN（参照用）
+        CfnOutput(
+            self,
+            "WorkloadIdentityArn",
+            value=self.workload_identity.attr_workload_identity_arn,
+            description="AgentCore Workload Identity ARN",
+            export_name="Healthmate-HealthManager-WorkloadIdentityArn"
+        )
+
+        # Cognito Domain（Token URL用）
+        CfnOutput(
+            self,
+            "CognitoDomain",
+            value=self.gateway_user_pool_domain.domain_name,
+            description="Cognito User Pool Domain for OAuth2 token endpoint",
+            export_name="Healthmate-HealthManager-CognitoDomain"
+        )
+
+        # OAuth2 Token URL（Credential Provider作成用）
+        CfnOutput(
+            self,
+            "OAuth2TokenUrl",
+            value=f"https://{self.gateway_user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
+            description="OAuth2 Token URL for Credential Provider configuration",
+            export_name="Healthmate-HealthManager-OAuth2TokenUrl"
+        )
 
         # M2M認証では直接トークンエンドポイントを使用
         CfnOutput(
@@ -673,8 +662,8 @@ class HealthmateHealthManagerStack(Stack):
         CfnOutput(
             self,
             "GatewayEndpoint",
-            value=f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
-            description="AgentCore Gateway Endpoint",
+            value=f"https://{self.agentcore_gateway.ref}.gateway.bedrock-agentcore.{self.region}.amazonaws.com/mcp",
+            description="AgentCore Gateway MCP Endpoint",
             export_name="Healthmate-HealthManager-GatewayEndpoint"
         )
 

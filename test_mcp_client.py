@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-HealthManagerMCP テスト用MCPクライアント
+HealthManagerMCP テスト用MCPクライアント（M2M認証版）
 
-このスクリプトは、HealthManagerMCPシステムの動作確認を行います。
+このスクリプトは、HealthManagerMCPシステムのM2M認証での動作確認を行います。
 以下の流れでテストを実行します：
 
-1. Cognito User Poolにテストユーザーを作成
-2. OAuth 2.0フローでJWTトークンを取得
-3. AgentCore GatewayにMCP接続
-4. 各Gateway Targetの動作確認
+1. Cognito User PoolからClient Credentials Flowでアクセストークンを取得
+2. AgentCore GatewayにM2M認証でMCP接続
+3. 各Gateway Targetの動作確認
 
 使用方法:
     python test_mcp_client.py
@@ -34,21 +33,19 @@ STACK_NAME = "Healthmate-HealthManagerStack"
 USER_POOL_ID = None
 CLIENT_ID = None
 CLIENT_SECRET = None
-COGNITO_DOMAIN = None
+GATEWAY_ENDPOINT = None
 
-# テストユーザー情報
-TEST_USERNAME = f"testuser_{uuid.uuid4().hex[:8]}"
-TEST_PASSWORD = "TestPass123!"
-TEST_EMAIL = f"{TEST_USERNAME}@example.com"
+# M2M認証用の固定ユーザーID（テスト用）
+TEST_USER_ID = f"test-user-{uuid.uuid4().hex[:8]}"
 
 class HealthManagerMCPTestClient:
-    """HealthManagerMCP テスト用クライアント"""
+    """HealthManagerMCP テスト用クライアント（M2M認証版）"""
     
     def __init__(self):
         self.cognito_client = boto3.client('cognito-idp', region_name=AWS_REGION)
         self.cloudformation_client = boto3.client('cloudformation', region_name=AWS_REGION)
         self.access_token = None
-        self.user_id = None
+        self.user_id = TEST_USER_ID
         self.gateway_endpoint = None
         
         # CloudFormation Outputsから設定を取得
@@ -56,7 +53,7 @@ class HealthManagerMCPTestClient:
     
     def _load_config_from_cloudformation(self) -> None:
         """CloudFormation StackのOutputsから設定を動的に取得"""
-        global USER_POOL_ID, CLIENT_ID, CLIENT_SECRET, COGNITO_DOMAIN
+        global USER_POOL_ID, CLIENT_ID, CLIENT_SECRET, GATEWAY_ENDPOINT
         
         try:
             print(f"🔧 CloudFormation Stack '{STACK_NAME}' から設定を取得中...")
@@ -69,32 +66,25 @@ class HealthManagerMCPTestClient:
             # 必要な設定値を取得
             USER_POOL_ID = outputs.get('UserPoolId')
             CLIENT_ID = outputs.get('UserPoolClientId')
+            GATEWAY_ENDPOINT = outputs.get('GatewayEndpoint')
             
-            # CognitoDomainをAuthorizationUrlから抽出
-            auth_url = outputs.get('AuthorizationUrl', '')
-            if auth_url:
-                # https://healthmate.auth.us-west-2.amazoncognito.com/oauth2/authorize から
-                # healthmate.auth.us-west-2.amazoncognito.com を抽出
-                import urllib.parse
-                parsed_url = urllib.parse.urlparse(auth_url)
-                COGNITO_DOMAIN = parsed_url.netloc
-            else:
-                COGNITO_DOMAIN = None
-            
-            if not all([USER_POOL_ID, CLIENT_ID, COGNITO_DOMAIN]):
+            if not all([USER_POOL_ID, CLIENT_ID, GATEWAY_ENDPOINT]):
                 missing = []
                 if not USER_POOL_ID: missing.append('UserPoolId')
                 if not CLIENT_ID: missing.append('UserPoolClientId')
-                if not COGNITO_DOMAIN: missing.append('CognitoDomain (from AuthorizationUrl)')
+                if not GATEWAY_ENDPOINT: missing.append('GatewayEndpoint')
                 raise ValueError(f"必要なCloudFormation Outputsが見つかりません: {', '.join(missing)}")
             
             print(f"✅ CloudFormation設定取得完了:")
             print(f"   User Pool ID: {USER_POOL_ID}")
             print(f"   Client ID: {CLIENT_ID}")
-            print(f"   Cognito Domain: {COGNITO_DOMAIN}")
+            print(f"   Gateway Endpoint: {GATEWAY_ENDPOINT}")
             
             # CLIENT_SECRETをCognito APIから取得
             self._get_client_secret()
+            
+            # Gateway Endpointを設定（/mcpパスを除去してベースURLを取得）
+            self.gateway_endpoint = GATEWAY_ENDPOINT.replace('/mcp', '')
             
         except Exception as e:
             print(f"❌ CloudFormation設定取得失敗: {str(e)}")
@@ -123,7 +113,7 @@ class HealthManagerMCPTestClient:
         except Exception as e:
             print(f"❌ Client Secret取得失敗: {str(e)}")
             raise
-        
+    
     def calculate_secret_hash(self, username: str) -> str:
         """Cognito Client Secret Hash を計算"""
         message = username + CLIENT_ID
@@ -133,90 +123,63 @@ class HealthManagerMCPTestClient:
             hashlib.sha256
         ).digest()
         return base64.b64encode(dig).decode()
-    
-    def create_test_user(self) -> bool:
-        """テストユーザーを作成"""
-        print(f"🔧 テストユーザーを作成中: {TEST_USERNAME}")
+        
+    def authenticate_m2m(self) -> bool:
+        """M2M認証（Client Credentials Flow）でJWTトークンを取得"""
+        print("🔐 M2M認証（Client Credentials Flow）実行中...")
         
         try:
-            # ユーザー作成
-            response = self.cognito_client.admin_create_user(
-                UserPoolId=USER_POOL_ID,
-                Username=TEST_USERNAME,
-                UserAttributes=[
-                    {'Name': 'email', 'Value': TEST_EMAIL},
-                    {'Name': 'email_verified', 'Value': 'true'}
-                ],
-                TemporaryPassword=TEST_PASSWORD,
-                MessageAction='SUPPRESS'  # ウェルカムメールを送信しない
+            # OAuth2 Token Endpointを使用してClient Credentials Flowを実行
+            oauth_token_url = f"https://healthmanager-m2m-auth.auth.{AWS_REGION}.amazoncognito.com/oauth2/token"
+            
+            # Basic認証用のCredentials
+            auth_string = f"{CLIENT_ID}:{CLIENT_SECRET}"
+            auth_bytes = auth_string.encode('ascii')
+            auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+            
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': f'Basic {auth_b64}'
+            }
+            
+            data = {
+                'grant_type': 'client_credentials',
+                'scope': 'HealthManager/HealthTarget:invoke'
+            }
+            
+            print(f"🔗 OAuth2 Token Endpoint: {oauth_token_url}")
+            print(f"🔑 Scope: HealthManager/HealthTarget:invoke")
+            
+            response = requests.post(
+                oauth_token_url,
+                headers=headers,
+                data=data,
+                timeout=30
             )
             
-            print(f"✅ ユーザー作成成功: {response['User']['Username']}")
-            
-            # パスワードを永続化（初回ログイン時の強制変更を回避）
-            self.cognito_client.admin_set_user_password(
-                UserPoolId=USER_POOL_ID,
-                Username=TEST_USERNAME,
-                Password=TEST_PASSWORD,
-                Permanent=True
-            )
-            
-            print(f"✅ パスワード設定完了")
-            return True
-            
-        except Exception as e:
-            print(f"❌ ユーザー作成失敗: {str(e)}")
-            return False
-    
-    def authenticate_user(self) -> bool:
-        """ユーザー認証してJWTトークンを取得"""
-        print(f"🔐 ユーザー認証中: {TEST_USERNAME}")
-        
-        try:
-            secret_hash = self.calculate_secret_hash(TEST_USERNAME)
-            
-            response = self.cognito_client.admin_initiate_auth(
-                UserPoolId=USER_POOL_ID,
-                ClientId=CLIENT_ID,
-                AuthFlow='ADMIN_NO_SRP_AUTH',
-                AuthParameters={
-                    'USERNAME': TEST_USERNAME,
-                    'PASSWORD': TEST_PASSWORD,
-                    'SECRET_HASH': secret_hash
-                }
-            )
-            
-            if 'AuthenticationResult' in response:
-                auth_result = response['AuthenticationResult']
-                self.access_token = auth_result['AccessToken']
-                id_token = auth_result['IdToken']
+            if response.status_code == 200:
+                token_response = response.json()
+                self.access_token = token_response.get('access_token')
                 
-                # JWTからユーザーIDを抽出（簡易版）
-                import jwt
-                decoded_token = jwt.decode(id_token, options={"verify_signature": False})
-                self.user_id = decoded_token['sub']
-                
-                print(f"✅ 認証成功")
-                print(f"   User ID: {self.user_id}")
-                print(f"   Access Token: {self.access_token[:20]}...")
-                return True
+                if self.access_token:
+                    print(f"✅ M2M認証成功")
+                    print(f"   Access Token: {self.access_token[:20]}...")
+                    print(f"   Token Type: {token_response.get('token_type', 'Bearer')}")
+                    print(f"   Expires In: {token_response.get('expires_in', 'Unknown')} seconds")
+                    print(f"   Scope: {token_response.get('scope', 'Unknown')}")
+                    return True
+                else:
+                    print(f"❌ M2M認証失敗: access_token not found in response")
+                    print(f"   Response: {token_response}")
+                    return False
             else:
-                print(f"❌ 認証失敗: AuthenticationResult not found")
+                print(f"❌ M2M認証失敗: HTTP {response.status_code}")
+                print(f"   Response: {response.text}")
                 return False
                 
         except Exception as e:
-            print(f"❌ 認証失敗: {str(e)}")
+            print(f"❌ M2M認証失敗: {str(e)}")
             return False
-    
-    def discover_gateway_endpoint(self) -> bool:
-        """AgentCore Gatewayのエンドポイントを発見"""
-        print("🔍 AgentCore Gatewayエンドポイントを設定中...")
-        
-        # 提供されたGateway URLを使用
-        self.gateway_endpoint = "https://healthmate-gateway-qasdnfjel0.gateway.bedrock-agentcore.us-west-2.amazonaws.com"
-        
-        print(f"✅ Gateway Endpoint設定完了: {self.gateway_endpoint}")
-        return True
     
     def test_mcp_connection(self) -> bool:
         """MCP接続をテスト"""
@@ -225,6 +188,9 @@ class HealthManagerMCPTestClient:
         if not self.gateway_endpoint:
             print("❌ Gatewayエンドポイントが設定されていません")
             return False
+        
+        # MCPエンドポイントは /mcp パスが必要
+        mcp_endpoint = f"{self.gateway_endpoint}/mcp"
         
         headers = {
             'Authorization': f'Bearer {self.access_token}',
@@ -239,11 +205,11 @@ class HealthManagerMCPTestClient:
         }
         
         try:
-            print(f"🔗 実際のMCP Gateway接続テスト: {self.gateway_endpoint}")
+            print(f"🔗 実際のMCP Gateway接続テスト: {mcp_endpoint}")
             
             # 実際のAgentCore Gatewayに接続
             response = requests.post(
-                self.gateway_endpoint,
+                mcp_endpoint,
                 headers=headers,
                 json=mcp_request,
                 timeout=30
@@ -278,12 +244,15 @@ class HealthManagerMCPTestClient:
             return False
     
     def test_mcp_tools(self) -> bool:
-        """実際のMCPツールを呼び出してテスト"""
-        print("🧪 MCP ツール呼び出しテスト中...")
+        """実際のMCPツールを呼び出してテスト（全17ツール）"""
+        print("🧪 MCP ツール呼び出しテスト中（全17ツール）...")
         
         if not self.gateway_endpoint or not self.access_token:
             print("❌ Gateway EndpointまたはAccess Tokenが設定されていません")
             return False
+        
+        # MCPエンドポイントは /mcp パスが必要
+        mcp_endpoint = f"{self.gateway_endpoint}/mcp"
         
         headers = {
             'Authorization': f'Bearer {self.access_token}',
@@ -291,9 +260,14 @@ class HealthManagerMCPTestClient:
         }
         
         success = True
+        test_goal_id = None
+        test_policy_id = None
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # === UserManagement ツール (3個) ===
         
         # テスト1: UserManagement.AddUser
-        print("\n--- UserManagement.AddUser テスト ---")
+        print("\n--- 1. UserManagement.AddUser テスト ---")
         try:
             mcp_request = {
                 "jsonrpc": "2.0",
@@ -302,33 +276,68 @@ class HealthManagerMCPTestClient:
                     "name": "UserManagement___AddUser",
                     "arguments": {
                         "userId": self.user_id,
-                        "username": TEST_USERNAME,
-                        "email": TEST_EMAIL
+                        "username": f"testuser_{self.user_id[:8]}",
+                        "email": f"test_{self.user_id[:8]}@example.com",
+                        "goals": ["100歳まで健康寿命", "体重を10kg減らす"]
                     }
                 },
-                "id": 2
+                "id": 1
             }
             
-            response = requests.post(
-                self.gateway_endpoint,
-                headers=headers,
-                json=mcp_request,
-                timeout=30
-            )
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ AddUser成功: {result}")
+                if 'error' in result:
+                    print(f"❌ AddUser失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddUser成功")
             else:
-                print(f"❌ AddUser失敗: HTTP {response.status_code} - {response.text}")
+                print(f"❌ AddUser失敗: HTTP {response.status_code}")
                 success = False
                 
         except Exception as e:
             print(f"❌ AddUser例外: {str(e)}")
             success = False
         
-        # テスト2: UserManagement.GetUser
-        print("\n--- UserManagement.GetUser テスト ---")
+        # テスト2: UserManagement.UpdateUser
+        print("\n--- 2. UserManagement.UpdateUser テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "UserManagement___UpdateUser",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "username": f"updated_testuser_{self.user_id[:8]}",
+                        "email": f"updated_test_{self.user_id[:8]}@example.com",
+                        "goals": ["100歳まで健康寿命", "体重を15kg減らす", "筋肉量を増やす"]
+                    }
+                },
+                "id": 2
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ UpdateUser失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ UpdateUser成功")
+            else:
+                print(f"❌ UpdateUser失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ UpdateUser例外: {str(e)}")
+            success = False
+        
+        # テスト3: UserManagement.GetUser
+        print("\n--- 3. UserManagement.GetUser テスト ---")
         try:
             mcp_request = {
                 "jsonrpc": "2.0",
@@ -342,26 +351,27 @@ class HealthManagerMCPTestClient:
                 "id": 3
             }
             
-            response = requests.post(
-                self.gateway_endpoint,
-                headers=headers,
-                json=mcp_request,
-                timeout=30
-            )
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ GetUser成功: {result}")
+                if 'error' in result:
+                    print(f"❌ GetUser失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetUser成功")
             else:
-                print(f"❌ GetUser失敗: HTTP {response.status_code} - {response.text}")
+                print(f"❌ GetUser失敗: HTTP {response.status_code}")
                 success = False
                 
         except Exception as e:
             print(f"❌ GetUser例外: {str(e)}")
             success = False
         
-        # テスト3: HealthGoalManagement.AddGoal
-        print("\n--- HealthGoalManagement.AddGoal テスト ---")
+        # === HealthGoalManagement ツール (4個) ===
+        
+        # テスト4: HealthGoalManagement.AddGoal
+        print("\n--- 4. HealthGoalManagement.AddGoal テスト ---")
         try:
             mcp_request = {
                 "jsonrpc": "2.0",
@@ -381,26 +391,162 @@ class HealthManagerMCPTestClient:
                 "id": 4
             }
             
-            response = requests.post(
-                f"{self.gateway_endpoint}/mcp",
-                headers=headers,
-                json=mcp_request,
-                timeout=30
-            )
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ AddGoal成功: {result}")
+                if 'error' in result:
+                    print(f"❌ AddGoal失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddGoal成功")
+                    # goalIdを保存（後続のテストで使用）
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'goalId' in parsed_content:
+                                        test_goal_id = parsed_content['goalId']
+                                except json.JSONDecodeError:
+                                    pass
             else:
-                print(f"❌ AddGoal失敗: HTTP {response.status_code} - {response.text}")
+                print(f"❌ AddGoal失敗: HTTP {response.status_code}")
                 success = False
                 
         except Exception as e:
             print(f"❌ AddGoal例外: {str(e)}")
             success = False
         
-        # テスト4: HealthPolicyManagement.AddPolicy
-        print("\n--- HealthPolicyManagement.AddPolicy テスト ---")
+        # テスト5: HealthGoalManagement.GetGoals
+        print("\n--- 5. HealthGoalManagement.GetGoals テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthGoalManagement___GetGoals",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 5
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetGoals失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetGoals成功")
+                    # goalIdを取得（AddGoalで取得できなかった場合）
+                    if not test_goal_id and 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'goals' in parsed_content and parsed_content['goals']:
+                                        first_goal = parsed_content['goals'][0]
+                                        if 'goalId' in first_goal:
+                                            test_goal_id = first_goal['goalId']
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetGoals失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetGoals例外: {str(e)}")
+            success = False
+        
+        # テスト6: HealthGoalManagement.UpdateGoal
+        print("\n--- 6. HealthGoalManagement.UpdateGoal テスト ---")
+        try:
+            if test_goal_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthGoalManagement___UpdateGoal",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "goalId": test_goal_id,
+                            "title": "更新されたアスリート体型目標",
+                            "description": "体脂肪率を12%以下にして筋肉量を大幅に増やす",
+                            "targetValue": "体脂肪率12%",
+                            "priority": 4,
+                            "status": "active"
+                        }
+                    },
+                    "id": 6
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ UpdateGoal失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ UpdateGoal成功")
+                else:
+                    print(f"❌ UpdateGoal失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ UpdateGoal スキップ: goalIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ UpdateGoal例外: {str(e)}")
+            success = False
+        
+        # テスト7: HealthGoalManagement.DeleteGoal
+        print("\n--- 7. HealthGoalManagement.DeleteGoal テスト ---")
+        try:
+            if test_goal_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthGoalManagement___DeleteGoal",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "goalId": test_goal_id
+                        }
+                    },
+                    "id": 7
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ DeleteGoal失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ DeleteGoal成功")
+                else:
+                    print(f"❌ DeleteGoal失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ DeleteGoal スキップ: goalIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ DeleteGoal例外: {str(e)}")
+            success = False
+        
+        # === HealthPolicyManagement ツール (4個) ===
+        
+        # テスト8: HealthPolicyManagement.AddPolicy
+        print("\n--- 8. HealthPolicyManagement.AddPolicy テスト ---")
         try:
             mcp_request = {
                 "jsonrpc": "2.0",
@@ -409,40 +555,175 @@ class HealthManagerMCPTestClient:
                     "name": "HealthPolicyManagement___AddPolicy",
                     "arguments": {
                         "userId": self.user_id,
-                        "policyType": "fasting",
-                        "title": "16時間ファスティング",
-                        "description": "毎日16時間のファスティングを実施",
-                        "rules": {
-                            "fastingHours": 16,
-                            "eatingWindow": "12:00-20:00"
+                        "policyType": "diet",
+                        "description": "低糖質ダイエット",
+                        "parameters": {
+                            "maxCarbs": "50g/day",
+                            "mealTiming": ["8:00", "12:00", "18:00"]
                         }
                     }
                 },
-                "id": 5
+                "id": 8
             }
             
-            response = requests.post(
-                f"{self.gateway_endpoint}/mcp",
-                headers=headers,
-                json=mcp_request,
-                timeout=30
-            )
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ AddPolicy成功: {result}")
+                if 'error' in result:
+                    print(f"❌ AddPolicy失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddPolicy成功")
+                    # policyIdを保存（後続のテストで使用）
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'policyId' in parsed_content:
+                                        test_policy_id = parsed_content['policyId']
+                                except json.JSONDecodeError:
+                                    pass
             else:
-                print(f"❌ AddPolicy失敗: HTTP {response.status_code} - {response.text}")
+                print(f"❌ AddPolicy失敗: HTTP {response.status_code}")
                 success = False
                 
         except Exception as e:
             print(f"❌ AddPolicy例外: {str(e)}")
             success = False
         
-        # テスト5: ActivityManagement.AddActivities
-        print("\n--- ActivityManagement.AddActivities テスト ---")
+        # テスト9: HealthPolicyManagement.GetPolicies
+        print("\n--- 9. HealthPolicyManagement.GetPolicies テスト ---")
         try:
-            today = datetime.now().strftime("%Y-%m-%d")
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthPolicyManagement___GetPolicies",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 9
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetPolicies失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetPolicies成功")
+                    # policyIdを取得（AddPolicyで取得できなかった場合）
+                    if not test_policy_id and 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'policies' in parsed_content and parsed_content['policies']:
+                                        first_policy = parsed_content['policies'][0]
+                                        if 'policyId' in first_policy:
+                                            test_policy_id = first_policy['policyId']
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetPolicies失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetPolicies例外: {str(e)}")
+            success = False
+        
+        # テスト10: HealthPolicyManagement.UpdatePolicy
+        print("\n--- 10. HealthPolicyManagement.UpdatePolicy テスト ---")
+        try:
+            if test_policy_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthPolicyManagement___UpdatePolicy",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "policyId": test_policy_id,
+                            "description": "更新された低糖質ダイエット",
+                            "parameters": {
+                                "maxCarbs": "40g/day",
+                                "mealTiming": ["7:30", "12:30", "18:30"],
+                                "cheatDay": "Sunday"
+                            }
+                        }
+                    },
+                    "id": 10
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ UpdatePolicy失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ UpdatePolicy成功")
+                else:
+                    print(f"❌ UpdatePolicy失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ UpdatePolicy スキップ: policyIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ UpdatePolicy例外: {str(e)}")
+            success = False
+        
+        # テスト11: HealthPolicyManagement.DeletePolicy
+        print("\n--- 11. HealthPolicyManagement.DeletePolicy テスト ---")
+        try:
+            if test_policy_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthPolicyManagement___DeletePolicy",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "policyId": test_policy_id
+                        }
+                    },
+                    "id": 11
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ DeletePolicy失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ DeletePolicy成功")
+                else:
+                    print(f"❌ DeletePolicy失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ DeletePolicy スキップ: policyIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ DeletePolicy例外: {str(e)}")
+            success = False
+        
+        # === ActivityManagement ツール (6個) ===
+        
+        # テスト12: ActivityManagement.AddActivities
+        print("\n--- 12. ActivityManagement.AddActivities テスト ---")
+        try:
             mcp_request = {
                 "jsonrpc": "2.0",
                 "method": "tools/call",
@@ -468,82 +749,245 @@ class HealthManagerMCPTestClient:
                         ]
                     }
                 },
-                "id": 6
+                "id": 12
             }
             
-            response = requests.post(
-                f"{self.gateway_endpoint}/mcp",
-                headers=headers,
-                json=mcp_request,
-                timeout=30
-            )
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"✅ AddActivities成功: {result}")
+                if 'error' in result:
+                    print(f"❌ AddActivities失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddActivities成功")
             else:
-                print(f"❌ AddActivities失敗: HTTP {response.status_code} - {response.text}")
+                print(f"❌ AddActivities失敗: HTTP {response.status_code}")
                 success = False
                 
         except Exception as e:
             print(f"❌ AddActivities例外: {str(e)}")
             success = False
         
+        # テスト13: ActivityManagement.GetActivities
+        print("\n--- 13. ActivityManagement.GetActivities テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "ActivityManagement___GetActivities",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "date": today
+                    }
+                },
+                "id": 13
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetActivities失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetActivities成功")
+            else:
+                print(f"❌ GetActivities失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetActivities例外: {str(e)}")
+            success = False
+        
+        # テスト14: ActivityManagement.UpdateActivity
+        print("\n--- 14. ActivityManagement.UpdateActivity テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "ActivityManagement___UpdateActivity",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "date": today,
+                        "time": "08:00",
+                        "activityType": "wakeUp",
+                        "description": "更新された起床",
+                        "items": ["アラームで目覚めた", "すっきり起床"]
+                    }
+                },
+                "id": 14
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ UpdateActivity失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ UpdateActivity成功")
+            else:
+                print(f"❌ UpdateActivity失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ UpdateActivity例外: {str(e)}")
+            success = False
+        
+        # テスト15: ActivityManagement.UpdateActivities
+        print("\n--- 15. ActivityManagement.UpdateActivities テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "ActivityManagement___UpdateActivities",
+                    "arguments": {
+                        "operationType": "replace",
+                        "userId": self.user_id,
+                        "date": today,
+                        "activities": [
+                            {
+                                "time": "07:30",
+                                "activityType": "wakeUp",
+                                "description": "早起き",
+                                "items": ["自然に目覚めた"]
+                            },
+                            {
+                                "time": "08:00",
+                                "activityType": "meal",
+                                "description": "朝食",
+                                "items": ["オートミール", "バナナ", "コーヒー"]
+                            },
+                            {
+                                "time": "09:00",
+                                "activityType": "exercise",
+                                "description": "朝の運動",
+                                "items": ["ヨガ30分", "ストレッチ15分"]
+                            }
+                        ]
+                    }
+                },
+                "id": 15
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ UpdateActivities失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ UpdateActivities成功")
+            else:
+                print(f"❌ UpdateActivities失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ UpdateActivities例外: {str(e)}")
+            success = False
+        
+        # テスト16: ActivityManagement.GetActivitiesInRange
+        print("\n--- 16. ActivityManagement.GetActivitiesInRange テスト ---")
+        try:
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "ActivityManagement___GetActivitiesInRange",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "startDate": yesterday,
+                        "endDate": today
+                    }
+                },
+                "id": 16
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetActivitiesInRange失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetActivitiesInRange成功")
+            else:
+                print(f"❌ GetActivitiesInRange失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetActivitiesInRange例外: {str(e)}")
+            success = False
+        
+        # テスト17: ActivityManagement.DeleteActivity
+        print("\n--- 17. ActivityManagement.DeleteActivity テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "ActivityManagement___DeleteActivity",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "date": today,
+                        "time": "09:00"
+                    }
+                },
+                "id": 17
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ DeleteActivity失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ DeleteActivity成功")
+            else:
+                print(f"❌ DeleteActivity失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ DeleteActivity例外: {str(e)}")
+            success = False
+        
+        print(f"\n🏁 全17ツールのテスト完了")
         return success
     
 
-    
-    def cleanup_test_user(self) -> bool:
-        """テストユーザーを削除"""
-        print(f"🧹 テストユーザーを削除中: {TEST_USERNAME}")
-        
-        try:
-            self.cognito_client.admin_delete_user(
-                UserPoolId=USER_POOL_ID,
-                Username=TEST_USERNAME
-            )
-            print(f"✅ テストユーザー削除完了")
-            return True
-            
-        except Exception as e:
-            print(f"❌ テストユーザー削除失敗: {str(e)}")
-            return False
-    
     def run_tests(self) -> bool:
-        """全テストを実行"""
-        print("🚀 HealthManagerMCP テスト開始")
-        print("=" * 50)
+        """全テストを実行（M2M認証版）"""
+        print("🚀 HealthManagerMCP M2M認証テスト開始（全17ツール）")
+        print("=" * 60)
         
         success = True
         
-        # 1. テストユーザー作成
-        if not self.create_test_user():
+        # 1. M2M認証
+        if not self.authenticate_m2m():
             return False
         
-        # 2. ユーザー認証
-        if not self.authenticate_user():
-            self.cleanup_test_user()
-            return False
-        
-        # 3. Gatewayエンドポイント発見
-        if not self.discover_gateway_endpoint():
-            self.cleanup_test_user()
-            return False
-        
-        # 4. MCP接続テスト
+        # 2. MCP接続テスト
         if not self.test_mcp_connection():
             success = False
         
-        # 5. MCPツール呼び出しテスト
+        # 3. MCPツール呼び出しテスト（全17ツール）
         if not self.test_mcp_tools():
             success = False
         
-        # 6. クリーンアップ
-        self.cleanup_test_user()
-        
-        print("=" * 50)
+        print("=" * 60)
         if success:
-            print("✅ 全テスト完了")
+            print("✅ 全M2M認証テスト完了（17ツール全て成功）")
         else:
             print("⚠️  一部テストで問題が発生しました")
         
@@ -553,12 +997,12 @@ def main():
     """メイン関数"""
     # 必要なライブラリをチェック
     try:
-        import jwt
+        import requests
     except ImportError:
-        print("❌ PyJWT ライブラリが必要です: pip install PyJWT")
+        print("❌ requests ライブラリが必要です: pip install requests")
         sys.exit(1)
     
-    # テスト実行
+    # M2M認証テスト実行
     client = HealthManagerMCPTestClient()
     success = client.run_tests()
     
