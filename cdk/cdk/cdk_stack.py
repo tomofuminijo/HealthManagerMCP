@@ -256,6 +256,24 @@ class HealthmateHealthManagerStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,  # 本番環境ではRETAINに変更
         )
 
+        # ========================================
+        # AgentCore Identity (Workload Identity)
+        # ========================================
+
+        # AgentCore Identity - RuntimeエージェントがGatewayを呼び出す際の認証アイデンティティ
+        self.workload_identity = bedrockagentcore.CfnWorkloadIdentity(
+            self,
+            "HealthManagerWorkloadIdentity",
+            workload_identity_name="healthmanager-agentcore-identity",
+            # カスタムプロバイダー（Cognito）を指定
+            provider_type="CUSTOM",
+            # M2M認証設定
+            client_id=self.gateway_app_client.user_pool_client_id,
+            client_secret_arn=self.client_secret.secret_arn,
+            # CognitoのDiscovery URLを設定
+            discovery_url=f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/openid-configuration"
+        )
+
 
 
         # ========================================
@@ -636,6 +654,15 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-IdentitySecretName"
         )
 
+        # AgentCore Identity名（Runtime環境変数用）
+        CfnOutput(
+            self,
+            "WorkloadIdentityName",
+            value=self.workload_identity.workload_identity_name,
+            description="AgentCore Workload Identity name for Runtime agent authentication",
+            export_name="Healthmate-HealthManager-WorkloadIdentityName"
+        )
+
         # M2M認証では直接トークンエンドポイントを使用
         CfnOutput(
             self,
@@ -760,6 +787,7 @@ class HealthmateHealthManagerStack(Stack):
                 "type": "m2m",
                 "userPoolId": self.gateway_user_pool.user_pool_id,
                 "clientId": self.gateway_app_client.user_pool_client_id,
+                "workloadIdentityName": self.workload_identity.workload_identity_name,
                 "identitySecretArn": self.client_secret.secret_full_arn,
                 "identitySecretName": self.client_secret.secret_name,
                 "discoveryUrl": discovery_url,

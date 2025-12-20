@@ -57,8 +57,8 @@
   - **Property 7: Environment-Appropriate Removal Policies**
   - **Validates: Requirements 2.3, 5.4**
 
-- [-] 5. CloudFormation出力の実装
-- [-] 5.1 AgentCore連携用出力の追加
+- [x] 5. CloudFormation出力の実装
+- [x] 5.1 AgentCore連携用出力の追加
   - User Pool ID、App Client ID、Secrets Manager ARNの出力
   - OIDC Discovery URLの出力
   - カスタムOAuthスコープの出力
@@ -68,7 +68,7 @@
   - **Property 5: CloudFormation Outputs Completeness**
   - **Validates: Requirements 1.5, 3.1, 3.2, 3.3, 3.4, 3.5**
 
-- [-] 5.3 ARN形式検証の実装
+- [x] 5.3 ARN形式検証の実装
   - Secrets Manager ARNの形式検証
   - AgentCore Identity用の適切なARN出力
   - _Requirements: 2.4_
