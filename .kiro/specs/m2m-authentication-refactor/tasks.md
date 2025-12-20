@@ -77,8 +77,8 @@
   - **Property 6: ARN Format Validation**
   - **Validates: Requirements 2.4**
 
-- [ ] 6. 後方互換性の確保
-- [ ] 6.1 既存リソース設定の保持
+- [x] 6. 後方互換性の確保
+- [x] 6.1 既存リソース設定の保持
   - DynamoDBテーブル設定の保持確認
   - Lambda関数設定の保持確認
   - AgentCore Gateway/Target設定の保持確認
@@ -89,7 +89,7 @@
   - **Property 8: Backward Compatibility Preservation**
   - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
 
-- [ ] 7. 統合テストとデプロイメント検証
+- [-] 7. 統合テストとデプロイメント検証
 - [ ] 7.1 CDKスタックのデプロイテスト
   - 新しいM2M認証設定でのスタックデプロイ
   - CloudFormation出力の確認

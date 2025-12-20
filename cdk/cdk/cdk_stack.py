@@ -181,16 +181,16 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         # AgentCore用のResource Serverとカスタムスコープを定義
+        health_target_scope = cognito.ResourceServerScope(
+            scope_name="HealthTarget:invoke",
+            scope_description="Permission to invoke HealthTarget operations via MCP Gateway"
+        )
+        
         self.gateway_resource_server = self.gateway_user_pool.add_resource_server(
             "HealthManagerResourceServer",
             identifier="HealthManager",
             user_pool_resource_server_name="HealthManager MCP Resource Server",
-            scopes=[
-                cognito.ResourceServerScope(
-                    scope_name="HealthTarget:invoke",
-                    scope_description="Permission to invoke HealthTarget operations via MCP Gateway"
-                )
-            ]
+            scopes=[health_target_scope]
         )
 
         # M2M認証専用のApp Client（AgentCore Gateway用）
@@ -201,14 +201,11 @@ class HealthmateHealthManagerStack(Stack):
             generate_secret=True,
             # OAuth設定（カスタムスコープ用）
             o_auth=cognito.OAuthSettings(
-                flows=cognito.OAuthFlows(
-                    client_credentials=True,  # M2M認証フロー
-                ),
                 scopes=[
                     # カスタムスコープ：HealthManager/HealthTarget:invoke
                     cognito.OAuthScope.resource_server(
                         self.gateway_resource_server, 
-                        self.gateway_resource_server.scopes[0]
+                        health_target_scope
                     )
                 ]
             ),
@@ -232,8 +229,8 @@ class HealthmateHealthManagerStack(Stack):
         cfn_gateway_app_client.add_property_override(
             "ExplicitAuthFlows",
             [
-                "ALLOW_CLIENT_CREDENTIALS",  # M2M認証の核心
-                "ALLOW_ADMIN_USER_PASSWORD_AUTH",  # テスト用
+                # M2M認証では標準的な認証フローを使用
+                "ALLOW_ADMIN_USER_PASSWORD_AUTH",  # 管理者認証（M2M用）
                 "ALLOW_REFRESH_TOKEN_AUTH",  # トークン更新用
             ]
         )
@@ -260,19 +257,19 @@ class HealthmateHealthManagerStack(Stack):
         # AgentCore Identity (Workload Identity)
         # ========================================
 
-        # AgentCore Identity - RuntimeエージェントがGatewayを呼び出す際の認証アイデンティティ
-        self.workload_identity = bedrockagentcore.CfnWorkloadIdentity(
-            self,
-            "HealthManagerWorkloadIdentity",
-            workload_identity_name="healthmanager-agentcore-identity",
-            # カスタムプロバイダー（Cognito）を指定
-            provider_type="CUSTOM",
-            # M2M認証設定
-            client_id=self.gateway_app_client.user_pool_client_id,
-            client_secret_arn=self.client_secret.secret_arn,
-            # CognitoのDiscovery URLを設定
-            discovery_url=f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/openid-configuration"
-        )
+        # TODO: AgentCore Identity - 現在のCDKバージョンでのパラメータを確認後に実装
+        # self.workload_identity = bedrockagentcore.CfnWorkloadIdentity(
+        #     self,
+        #     "HealthManagerWorkloadIdentity",
+        #     name="healthmanager-agentcore-identity",
+        #     # カスタムプロバイダー（Cognito）を指定
+        #     provider_type="CUSTOM",
+        #     # M2M認証設定
+        #     client_id=self.gateway_app_client.user_pool_client_id,
+        #     client_secret_arn=self.client_secret.secret_arn,
+        #     # CognitoのDiscovery URLを設定
+        #     discovery_url=f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/openid-configuration"
+        # )
 
 
 
@@ -655,13 +652,14 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         # AgentCore Identity名（Runtime環境変数用）
-        CfnOutput(
-            self,
-            "WorkloadIdentityName",
-            value=self.workload_identity.workload_identity_name,
-            description="AgentCore Workload Identity name for Runtime agent authentication",
-            export_name="Healthmate-HealthManager-WorkloadIdentityName"
-        )
+        # TODO: Workload Identity実装後に有効化
+        # CfnOutput(
+        #     self,
+        #     "WorkloadIdentityName",
+        #     value=self.workload_identity.name,
+        #     description="AgentCore Workload Identity name for Runtime agent authentication",
+        #     export_name="Healthmate-HealthManager-WorkloadIdentityName"
+        # )
 
         # M2M認証では直接トークンエンドポイントを使用
         CfnOutput(
@@ -778,36 +776,4 @@ class HealthmateHealthManagerStack(Stack):
             value="HealthManager/HealthTarget:invoke",
             description="Custom OAuth scope for AgentCore Gateway M2M authentication",
             export_name="Healthmate-HealthManager-CustomScope"
-        )
-
-        # M2M認証用のMCP接続設定（JSON形式）
-        mcp_connection_config = {
-            "gatewayEndpoint": f"https://{self.agentcore_gateway.ref}.agentcore.{self.region}.amazonaws.com",
-            "authConfig": {
-                "type": "m2m",
-                "userPoolId": self.gateway_user_pool.user_pool_id,
-                "clientId": self.gateway_app_client.user_pool_client_id,
-                "workloadIdentityName": self.workload_identity.workload_identity_name,
-                "identitySecretArn": self.client_secret.secret_full_arn,
-                "identitySecretName": self.client_secret.secret_name,
-                "discoveryUrl": discovery_url,
-                "jwksUrl": f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json",
-                "customScope": "HealthManager/HealthTarget:invoke"
-            },
-            "tools": {
-                "userManagement": "UserManagement",
-                "healthGoalManagement": "HealthGoalManagement",
-                "healthPolicyManagement": "HealthPolicyManagement", 
-                "activityManagement": "ActivityManagement"
-            },
-            "region": self.region,
-            "accountId": self.account
-        }
-
-        CfnOutput(
-            self,
-            "MCPConnectionConfig",
-            value=json.dumps(mcp_connection_config, indent=2),
-            description="M2M MCP connection configuration (JSON)",
-            export_name="Healthmate-HealthManager-MCPConnectionConfig"
         )
