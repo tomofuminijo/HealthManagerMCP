@@ -238,6 +238,24 @@ class HealthmateHealthManagerStack(Stack):
             ]
         )
 
+        # ========================================
+        # Secrets Manager統合
+        # ========================================
+
+        # クライアントシークレットをSecrets Managerに保存
+        self.client_secret = secretsmanager.Secret(
+            self,
+            "HealthManagerM2MClientSecret",
+            secret_name=f"AgentCoreIdentitySecret/HealthManager/{self.stack_name}",
+            description="Client secret for AgentCore Gateway M2M authentication",
+            # CDK SecretValueメカニズムを使用してクライアントシークレットを安全に保存
+            secret_string_value=SecretValue.unsafe_plain_text(
+                self.gateway_app_client.user_pool_client_secret.unsafe_unwrap()
+            ),
+            # 環境別RemovalPolicy設定（開発環境用のDESTROY）
+            removal_policy=RemovalPolicy.DESTROY,  # 本番環境ではRETAINに変更
+        )
+
 
 
         # ========================================
@@ -600,6 +618,15 @@ class HealthmateHealthManagerStack(Stack):
             export_name="Healthmate-HealthManager-UserPoolClientId"
         )
 
+        # Secrets Manager ARN（AgentCore Identity用）
+        CfnOutput(
+            self,
+            "IdentitySecretArn",
+            value=self.client_secret.secret_full_arn,
+            description="Secrets Manager ARN for AgentCore Identity client secret access",
+            export_name="Healthmate-HealthManager-IdentitySecretArn"
+        )
+
         # M2M認証では直接トークンエンドポイントを使用
         CfnOutput(
             self,
@@ -724,6 +751,7 @@ class HealthmateHealthManagerStack(Stack):
                 "type": "m2m",
                 "userPoolId": self.gateway_user_pool.user_pool_id,
                 "clientId": self.gateway_app_client.user_pool_client_id,
+                "identitySecretArn": self.client_secret.secret_full_arn,
                 "discoveryUrl": discovery_url,
                 "jwksUrl": f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json",
                 "customScope": "HealthManager/HealthTarget:invoke"

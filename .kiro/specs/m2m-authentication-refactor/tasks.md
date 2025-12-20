@@ -27,8 +27,8 @@
   - **Property 2: Client Credentials Flow Configuration**
   - **Validates: Requirements 1.2, 5.2**
 
-- [-] 3. カスタムOAuthスコープの実装
-- [-] 3.1 AgentCore用カスタムスコープの定義
+- [x] 3. カスタムOAuthスコープの実装
+- [x] 3.1 AgentCore用カスタムスコープの定義
   - "HealthManager/HealthTarget:invoke"形式のスコープ実装
   - App ClientのOAuth設定にカスタムスコープを追加
   - _Requirements: 1.3, 5.5_
@@ -37,8 +37,8 @@
   - **Property 3: Custom OAuth Scope Format**
   - **Validates: Requirements 1.3, 5.5**
 
-- [ ] 4. Secrets Manager統合の実装
-- [ ] 4.1 クライアントシークレットのSecrets Manager保存
+- [-] 4. Secrets Manager統合の実装
+- [-] 4.1 クライアントシークレットのSecrets Manager保存
   - Secrets Managerリソースの作成
   - 適切な命名規則での保存実装
   - CDK SecretValueメカニズムの使用
@@ -48,7 +48,7 @@
   - **Property 4: Secrets Manager Integration**
   - **Validates: Requirements 1.4, 2.1, 2.2, 5.3**
 
-- [ ] 4.3 RemovalPolicy設定の実装
+- [-] 4.3 RemovalPolicy設定の実装
   - 開発環境用のDESTROYポリシー設定
   - 環境別設定の実装
   - _Requirements: 2.3, 5.4_
