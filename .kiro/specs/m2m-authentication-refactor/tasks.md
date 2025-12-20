@@ -89,8 +89,8 @@
   - **Property 8: Backward Compatibility Preservation**
   - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
 
-- [-] 7. 統合テストとデプロイメント検証
-- [ ] 7.1 CDKスタックのデプロイテスト
+- [x] 7. 統合テストとデプロイメント検証
+- [x] 7.1 CDKスタックのデプロイテスト
   - 新しいM2M認証設定でのスタックデプロイ
   - CloudFormation出力の確認
   - Secrets Managerの動作確認
@@ -101,5 +101,5 @@
   - AgentCore Gateway連携テスト
   - エラーケースの動作確認
 
-- [ ] 8. 最終チェックポイント
+- [-] 8. 最終チェックポイント
   - すべてのテストが通ることを確認し、問題があれば質問する
