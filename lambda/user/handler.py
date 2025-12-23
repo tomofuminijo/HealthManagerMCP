@@ -14,7 +14,8 @@ AgentCore Gateway（MCP）から呼び出され、DynamoDBでユーザー情報�
 
 import json
 import os
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timezone, date
 from typing import Any, Dict
 import boto3
 from botocore.exceptions import ClientError
@@ -117,23 +118,29 @@ def add_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     既存ユーザーが存在する場合は更新、存在しない場合は新規作成を行います。
 
     Args:
-        parameters: userId, username, email(optional)
+        parameters: userId, username, email(optional), dateOfBirth(optional)
 
     Returns:
         作成/更新されたユーザー情報
 
     Raises:
-        ValueError: 必須パラメータが不足している場合
+        ValueError: 必須パラメータが不足している場合、または生年月日の検証に失敗した場合
         ClientError: DynamoDB操作でエラーが発生した場合
     """
     user_id = parameters.get("userId")
     username = parameters.get("username")
     email = parameters.get("email", "")
+    date_of_birth = parameters.get("dateOfBirth")
 
     if not user_id:
         raise ValueError("userId is required")
     if not username:
         raise ValueError("username is required")
+
+    # 生年月日のバリデーション（提供された場合のみ）
+    if date_of_birth is not None:
+        validate_date_of_birth(date_of_birth)
+        print(f"[UserLambda] Date of birth validated: {date_of_birth}")
 
     print(f"[UserLambda] Adding/updating user: {user_id}, username: {username}")
 
@@ -147,6 +154,10 @@ def add_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         "createdAt": now,
         "lastLoginAt": now,
     }
+
+    # 生年月日が提供された場合のみ追加
+    if date_of_birth is not None:
+        item["dateOfBirth"] = date_of_birth
 
     try:
         # 既存ユーザーの確認
@@ -167,17 +178,25 @@ def add_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         table.put_item(Item=item)
         
         print(f"[UserLambda] User {operation} successfully: {user_id}")
+        
+        # レスポンス用のユーザー情報を構築
+        user_response = {
+            "userId": user_id,
+            "username": username,
+            "email": email,
+            "createdAt": item["createdAt"],
+            "lastLoginAt": item["lastLoginAt"]
+        }
+        
+        # 生年月日が存在する場合のみレスポンスに含める
+        if date_of_birth is not None:
+            user_response["dateOfBirth"] = date_of_birth
+        
         return {
             "success": True,
             "userId": user_id,
             "message": f"ユーザー情報を{operation}しました",
-            "user": {
-                "userId": user_id,
-                "username": username,
-                "email": email,
-                "createdAt": item["createdAt"],
-                "lastLoginAt": item["lastLoginAt"]
-            }
+            "user": user_response
         }
 
     except ClientError as e:
@@ -191,18 +210,19 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     既存のユーザー情報を部分的に更新
 
     Args:
-        parameters: userId, username(optional), email(optional), lastLoginAt(optional)
+        parameters: userId, username(optional), email(optional), dateOfBirth(optional), lastLoginAt(optional)
 
     Returns:
         更新結果
 
     Raises:
-        ValueError: 必須パラメータが不足している場合、または更新対象フィールドがない場合
+        ValueError: 必須パラメータが不足している場合、更新対象フィールドがない場合、または生年月日の検証に失敗した場合
         ClientError: DynamoDB操作でエラーが発生した場合
     """
     user_id = parameters.get("userId")
     username = parameters.get("username")
     email = parameters.get("email")
+    date_of_birth = parameters.get("dateOfBirth")
     last_login_at = parameters.get("lastLoginAt")
 
     if not user_id:
@@ -212,6 +232,7 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     # 更新式を構築
     update_expression_parts = []
+    remove_expression_parts = []
     expression_attribute_values = {}
 
     if username is not None:
@@ -224,6 +245,18 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         expression_attribute_values[":email"] = email
         print(f"[UserLambda] Updating email to: {email}")
 
+    # 生年月日の処理
+    if date_of_birth is not None:
+        if date_of_birth == "":  # 空文字列の場合は削除
+            remove_expression_parts.append("dateOfBirth")
+            print(f"[UserLambda] Removing dateOfBirth field")
+        else:
+            # 生年月日の検証
+            validate_date_of_birth(date_of_birth)
+            update_expression_parts.append("dateOfBirth = :dateOfBirth")
+            expression_attribute_values[":dateOfBirth"] = date_of_birth
+            print(f"[UserLambda] Updating dateOfBirth to: {date_of_birth}")
+
     if last_login_at is not None:
         update_expression_parts.append("lastLoginAt = :lastLoginAt")
         expression_attribute_values[":lastLoginAt"] = last_login_at
@@ -235,17 +268,25 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         expression_attribute_values[":lastLoginAt"] = now
         print(f"[UserLambda] Setting lastLoginAt to current time: {now}")
 
-    if not update_expression_parts:
-        raise ValueError("At least one field to update is required (username, email, or lastLoginAt)")
+    # 更新対象フィールドがない場合はエラー
+    if not update_expression_parts and not remove_expression_parts:
+        raise ValueError("At least one field to update is required (username, email, dateOfBirth, or lastLoginAt)")
 
-    update_expression = "SET " + ", ".join(update_expression_parts)
+    # 更新式を構築
+    update_expression = ""
+    if update_expression_parts:
+        update_expression += "SET " + ", ".join(update_expression_parts)
+    if remove_expression_parts:
+        if update_expression:
+            update_expression += " "
+        update_expression += "REMOVE " + ", ".join(remove_expression_parts)
 
     try:
         # ユーザーが存在することを確認しながら更新
         response = table.update_item(
             Key={"userId": user_id},
             UpdateExpression=update_expression,
-            ExpressionAttributeValues=expression_attribute_values,
+            ExpressionAttributeValues=expression_attribute_values if expression_attribute_values else None,
             ConditionExpression="attribute_exists(userId)",  # ユーザーが存在することを確認
             ReturnValues="ALL_NEW",
         )
@@ -253,17 +294,24 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         updated_user = response["Attributes"]
         print(f"[UserLambda] User updated successfully: {user_id}")
         
+        # レスポンス用のユーザー情報を構築
+        user_response = {
+            "userId": updated_user.get("userId"),
+            "username": updated_user.get("username"),
+            "email": updated_user.get("email", ""),
+            "createdAt": updated_user.get("createdAt"),
+            "lastLoginAt": updated_user.get("lastLoginAt")
+        }
+        
+        # 生年月日が存在する場合のみレスポンスに含める
+        if "dateOfBirth" in updated_user:
+            user_response["dateOfBirth"] = updated_user["dateOfBirth"]
+        
         return {
             "success": True,
             "userId": user_id,
             "message": "ユーザー情報を更新しました",
-            "user": {
-                "userId": updated_user.get("userId"),
-                "username": updated_user.get("username"),
-                "email": updated_user.get("email", ""),
-                "createdAt": updated_user.get("createdAt"),
-                "lastLoginAt": updated_user.get("lastLoginAt")
-            }
+            "user": user_response
         }
 
     except ClientError as e:
@@ -284,7 +332,7 @@ def get_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         parameters: userId
 
     Returns:
-        ユーザー情報
+        ユーザー情報（生年月日が存在する場合は含める）
 
     Raises:
         ValueError: userIdが指定されていない場合
@@ -303,15 +351,26 @@ def get_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if "Item" in response:
             user = response["Item"]
             print(f"[UserLambda] User retrieved successfully: {user_id}")
+            
+            # レスポンス用のユーザー情報を構築
+            user_response = {
+                "userId": user.get("userId"),
+                "username": user.get("username"),
+                "email": user.get("email", ""),
+                "createdAt": user.get("createdAt"),
+                "lastLoginAt": user.get("lastLoginAt"),
+            }
+            
+            # 生年月日が存在する場合のみレスポンスに含める（後方互換性を維持）
+            if "dateOfBirth" in user:
+                user_response["dateOfBirth"] = user["dateOfBirth"]
+                print(f"[UserLambda] Including dateOfBirth in response: {user['dateOfBirth']}")
+            else:
+                print(f"[UserLambda] No dateOfBirth found for user: {user_id}")
+            
             return {
                 "success": True,
-                "user": {
-                    "userId": user.get("userId"),
-                    "username": user.get("username"),
-                    "email": user.get("email", ""),
-                    "createdAt": user.get("createdAt"),
-                    "lastLoginAt": user.get("lastLoginAt"),
-                }
+                "user": user_response
             }
         else:
             print(f"[UserLambda] User not found: {user_id}")
@@ -324,4 +383,41 @@ def get_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         print(f"[UserLambda] DynamoDB error in get_user: {error_code} - {str(e)}")
+        raise
+
+
+def validate_date_of_birth(date_of_birth: str) -> None:
+    """
+    生年月日の検証を行う
+    
+    Args:
+        date_of_birth: YYYY-MM-DD形式の日付文字列
+        
+    Raises:
+        ValueError: 無効な日付形式または値の場合
+    """
+    if not isinstance(date_of_birth, str):
+        raise ValueError("生年月日は文字列で入力してください")
+    
+    # 形式チェック（YYYY-MM-DD）
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_of_birth):
+        raise ValueError("生年月日はYYYY-MM-DD形式で入力してください")
+    
+    try:
+        # 日付の妥当性チェック
+        birth_date = datetime.strptime(date_of_birth, '%Y-%m-%d').date()
+        
+        # 未来の日付チェック
+        if birth_date > date.today():
+            raise ValueError("生年月日は過去の日付である必要があります")
+        
+        # 非現実的な過去の日付チェック（1900年以前）
+        if birth_date.year < 1900:
+            raise ValueError("生年月日は1900年以降の日付を入力してください")
+            
+    except ValueError as e:
+        # datetime.strptimeでの解析エラーをキャッチ
+        if "time data" in str(e) or "does not match format" in str(e):
+            raise ValueError("無効な日付です。正しい日付を入力してください")
+        # 既に適切なエラーメッセージの場合はそのまま再発生
         raise
