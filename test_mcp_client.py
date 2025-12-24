@@ -16,8 +16,16 @@ HealthManagerMCP テスト用MCPクライアント（M2M認証版）
 - ActivityManagement (6ツール): AddActivities, UpdateActivity, UpdateActivities, DeleteActivity, GetActivities, GetActivitiesInRange
 - BodyMeasurementManagement (6ツール): AddBodyMeasurement, UpdateBodyMeasurement, DeleteBodyMeasurement, GetLatestMeasurements, GetOldestMeasurements, GetMeasurementHistory
 
+環境設定:
+    HEALTHMATE_ENV環境変数で環境を指定（dev/stage/prod、デフォルト: dev）
+    
 使用方法:
+    # デフォルト環境（dev）でテスト
     python test_mcp_client.py
+    
+    # 特定の環境でテスト
+    HEALTHMATE_ENV=stage python test_mcp_client.py
+    HEALTHMATE_ENV=prod python test_mcp_client.py
 """
 
 import json
@@ -32,9 +40,17 @@ from typing import Dict, Any, Optional
 import os
 import sys
 
-# AWS設定
-AWS_REGION = "us-west-2"
-STACK_NAME = "Healthmate-HealthManagerStack"
+# 環境設定モジュールのインポート
+sys.path.append(os.path.join(os.path.dirname(__file__), 'cdk'))
+from cdk.environment.configuration_provider import ConfigurationProvider
+from cdk.environment.environment_manager import EnvironmentManager
+
+# 環境設定の初期化
+config_provider = ConfigurationProvider("HealthManager")
+AWS_REGION = config_provider.get_aws_region()
+STACK_NAME = config_provider.get_stack_name("Healthmate-HealthManagerStack")
+ENVIRONMENT = EnvironmentManager.get_environment()
+ENVIRONMENT_SUFFIX = config_provider.get_environment_suffix()
 
 # 動的に取得される設定値（CloudFormation Outputsから）
 USER_POOL_ID = None
@@ -64,6 +80,7 @@ class HealthManagerMCPTestClient:
         
         try:
             print(f"🔧 CloudFormation Stack '{STACK_NAME}' から設定を取得中...")
+            print(f"🌍 Environment: {ENVIRONMENT}")
             
             # CloudFormation Outputsを取得
             response = self.cloudformation_client.describe_stacks(StackName=STACK_NAME)
@@ -86,6 +103,7 @@ class HealthManagerMCPTestClient:
             print(f"   User Pool ID: {USER_POOL_ID}")
             print(f"   Client ID: {CLIENT_ID}")
             print(f"   Gateway Endpoint: {GATEWAY_ENDPOINT}")
+            print(f"   Environment Suffix: {ENVIRONMENT_SUFFIX}")
             
             # CLIENT_SECRETをCognito APIから取得
             self._get_client_secret()
@@ -96,6 +114,8 @@ class HealthManagerMCPTestClient:
         except Exception as e:
             print(f"❌ CloudFormation設定取得失敗: {str(e)}")
             print("   CloudFormation Stackがデプロイされていることを確認してください")
+            print(f"   Stack名: {STACK_NAME}")
+            print(f"   Environment: {ENVIRONMENT}")
             raise
     
     def _get_client_secret(self) -> None:
@@ -136,8 +156,10 @@ class HealthManagerMCPTestClient:
         print("🔐 M2M認証（Client Credentials Flow）実行中...")
         
         try:
-            # OAuth2 Token Endpointを使用してClient Credentials Flowを実行
-            oauth_token_url = f"https://healthmanager-m2m-auth.auth.{AWS_REGION}.amazoncognito.com/oauth2/token"
+            # 環境別のOAuth2 Token Endpointを構築
+            # 環境別のCognito Domain名を使用
+            cognito_domain = f"healthmanager-m2m-auth{ENVIRONMENT_SUFFIX}"
+            oauth_token_url = f"https://{cognito_domain}.auth.{AWS_REGION}.amazoncognito.com/oauth2/token"
             
             # Basic認証用のCredentials
             auth_string = f"{CLIENT_ID}:{CLIENT_SECRET}"
@@ -156,6 +178,7 @@ class HealthManagerMCPTestClient:
             
             print(f"🔗 OAuth2 Token Endpoint: {oauth_token_url}")
             print(f"🔑 Scope: HealthManager/HealthTarget:invoke")
+            print(f"🌍 Environment: {ENVIRONMENT}")
             
             response = requests.post(
                 oauth_token_url,
@@ -1415,6 +1438,8 @@ class HealthManagerMCPTestClient:
     def run_tests(self) -> bool:
         """全テストを実行（M2M認証版）"""
         print("🚀 HealthManagerMCP M2M認証テスト開始（全23ツール）")
+        print(f"🌍 Environment: {ENVIRONMENT}")
+        print(f"📦 Stack Name: {STACK_NAME}")
         print("=" * 60)
         
         success = True
@@ -1441,6 +1466,12 @@ class HealthManagerMCPTestClient:
 
 def main():
     """メイン関数"""
+    # 環境情報を表示
+    print(f"🌍 Environment: {ENVIRONMENT}")
+    print(f"📦 Stack Name: {STACK_NAME}")
+    print(f"🏷️  Environment Suffix: {ENVIRONMENT_SUFFIX}")
+    print()
+    
     # 必要なライブラリをチェック
     try:
         import requests
