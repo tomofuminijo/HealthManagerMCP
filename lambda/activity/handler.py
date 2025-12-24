@@ -245,7 +245,7 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
     指定したactivityIdの活動を部分的に更新する
 
     Args:
-        parameters: userId, activityId, time(optional), activityType(optional), description(optional), items(optional)
+        parameters: userId, date, activityId, time(optional), activityType(optional), description(optional), items(optional)
 
     Returns:
         更新結果
@@ -255,6 +255,7 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
         ClientError: DynamoDB操作でエラーが発生した場合
     """
     user_id = parameters.get("userId")
+    date = parameters.get("date")
     activity_id = parameters.get("activityId")
     time = parameters.get("time")
     activity_type = parameters.get("activityType")
@@ -263,10 +264,12 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     if not user_id:
         raise ValueError("userId is required")
+    if not date:
+        raise ValueError("date is required")
     if not activity_id:
         raise ValueError("activityId is required")
 
-    logger.debug(f"Updating activity for user: {user_id} with activityId: {activity_id}")
+    logger.debug(f"Updating activity for user: {user_id} on date: {date} with activityId: {activity_id}")
 
     # itemsが文字列の場合はリストに変換
     if isinstance(items, str):
@@ -275,64 +278,53 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
 
     try:
-        # 全ての日付のレコードを検索してactivityIdを探す
-        # まず、最近の日付から検索（効率化のため）
+        # 指定された日付のレコードを取得
+        response = table.get_item(Key={"userId": user_id, "date": date})
+        
+        if "Item" not in response:
+            raise ValueError(f"No activities found for user: {user_id} on date: {date}")
+        
+        activities = response["Item"].get("activities", [])
         activity_found = False
-        target_date = None
         updated_activity = None
         
-        # 過去30日間を検索（通常はこの範囲内にあると想定）
-        from datetime import date, timedelta
-        today = date.today()
+        # 指定されたactivityIdの活動を検索して更新
+        for activity in activities:
+            if activity.get("activityId") == activity_id:
+                activity_found = True
+                
+                # 活動を更新（指定されたフィールドのみ）
+                if time is not None:
+                    activity["time"] = time
+                if activity_type is not None:
+                    activity["activityType"] = activity_type
+                if description is not None:
+                    activity["description"] = description
+                if items is not None:
+                    activity["items"] = items
+                
+                updated_activity = activity.copy()
+                break
         
-        for i in range(30):
-            search_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-            
-            response = table.get_item(Key={"userId": user_id, "date": search_date})
-            
-            if "Item" in response:
-                activities = response["Item"].get("activities", [])
-                
-                for activity in activities:
-                    if activity.get("activityId") == activity_id:
-                        activity_found = True
-                        target_date = search_date
-                        
-                        # 活動を更新
-                        if time is not None:
-                            activity["time"] = time
-                        if activity_type is not None:
-                            activity["activityType"] = activity_type
-                        if description is not None:
-                            activity["description"] = description
-                        if items is not None:
-                            activity["items"] = items
-                        
-                        updated_activity = activity.copy()
-                        
-                        # 更新されたリストを保存
-                        table.update_item(
-                            Key={"userId": user_id, "date": search_date},
-                            UpdateExpression="SET activities = :activities, updatedAt = :updatedAt",
-                            ExpressionAttributeValues={
-                                ":activities": activities,
-                                ":updatedAt": now,
-                            },
-                        )
-                        break
-                
-                if activity_found:
-                    break
-
         if not activity_found:
-            raise ValueError(f"Activity with activityId: {activity_id} not found")
+            raise ValueError(f"Activity with activityId: {activity_id} not found on date: {date}")
+        
+        # 更新されたリストを保存
+        table.update_item(
+            Key={"userId": user_id, "date": date},
+            UpdateExpression="SET activities = :activities, updatedAt = :updatedAt",
+            ExpressionAttributeValues={
+                ":activities": activities,
+                ":updatedAt": now,
+            },
+        )
 
-        logger.info(f"Activity updated successfully for user: {user_id} with activityId: {activity_id}")
+        logger.info(f"Activity updated successfully for user: {user_id} on date: {date} with activityId: {activity_id}")
         return {
             "success": True,
             "message": f"活動ID {activity_id} を更新しました",
             "activityId": activity_id,
-            "date": target_date,
+            "date": date,
             "updatedActivity": updated_activity
         }
 
@@ -443,7 +435,7 @@ def delete_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
     指定したactivityIdの活動を削除する
 
     Args:
-        parameters: userId, activityId
+        parameters: userId, date, activityId
 
     Returns:
         削除結果
@@ -453,77 +445,68 @@ def delete_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
         ClientError: DynamoDB操作でエラーが発生した場合
     """
     user_id = parameters.get("userId")
+    date = parameters.get("date")
     activity_id = parameters.get("activityId")
 
     if not user_id:
         raise ValueError("userId is required")
+    if not date:
+        raise ValueError("date is required")
     if not activity_id:
         raise ValueError("activityId is required")
 
-    logger.debug(f"Deleting activity for user: {user_id} with activityId: {activity_id}")
+    logger.debug(f"Deleting activity for user: {user_id} on date: {date} with activityId: {activity_id}")
 
     now = datetime.now(timezone.utc).isoformat()
 
     try:
-        # 全ての日付のレコードを検索してactivityIdを探す
-        # まず、最近の日付から検索（効率化のため）
+        # 指定された日付のレコードを取得
+        response = table.get_item(Key={"userId": user_id, "date": date})
+        
+        if "Item" not in response:
+            raise ValueError(f"No activities found for user: {user_id} on date: {date}")
+        
+        activities = response["Item"].get("activities", [])
         activity_found = False
-        target_date = None
         deleted_activity = None
         
-        # 過去30日間を検索（通常はこの範囲内にあると想定）
-        from datetime import date, timedelta
-        today = date.today()
+        # 指定されたactivityIdの活動を検索
+        for activity in activities:
+            if activity.get("activityId") == activity_id:
+                deleted_activity = activity.copy()
+                activity_found = True
+                break
         
-        for i in range(30):
-            search_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-            
-            response = table.get_item(Key={"userId": user_id, "date": search_date})
-            
-            if "Item" in response:
-                activities = response["Item"].get("activities", [])
-                original_length = len(activities)
-                
-                # 削除対象の活動を保存してから削除
-                for activity in activities:
-                    if activity.get("activityId") == activity_id:
-                        deleted_activity = activity.copy()
-                        activity_found = True
-                        target_date = search_date
-                        break
-                
-                if activity_found:
-                    # 指定されたactivityIdの活動を削除
-                    activities = [a for a in activities if a.get("activityId") != activity_id]
-                    
-                    if len(activities) == 0:
-                        # すべての活動が削除された場合、レコード自体を削除
-                        table.delete_item(Key={"userId": user_id, "date": search_date})
-                        logger.debug(f"Deleted entire record (last activity removed)")
-                    else:
-                        # 更新されたリストを保存
-                        table.update_item(
-                            Key={"userId": user_id, "date": search_date},
-                            UpdateExpression="SET activities = :activities, updatedAt = :updatedAt",
-                            ExpressionAttributeValues={
-                                ":activities": activities,
-                                ":updatedAt": now,
-                            },
-                        )
-                        logger.debug(f"Updated record with remaining {len(activities)} activities")
-                    break
-
         if not activity_found:
-            raise ValueError(f"Activity with activityId: {activity_id} not found")
+            raise ValueError(f"Activity with activityId: {activity_id} not found on date: {date}")
+        
+        # 指定されたactivityIdの活動を削除
+        activities = [a for a in activities if a.get("activityId") != activity_id]
+        
+        if len(activities) == 0:
+            # すべての活動が削除された場合、レコード自体を削除
+            table.delete_item(Key={"userId": user_id, "date": date})
+            logger.debug(f"Deleted entire record (last activity removed)")
+        else:
+            # 更新されたリストを保存
+            table.update_item(
+                Key={"userId": user_id, "date": date},
+                UpdateExpression="SET activities = :activities, updatedAt = :updatedAt",
+                ExpressionAttributeValues={
+                    ":activities": activities,
+                    ":updatedAt": now,
+                },
+            )
+            logger.debug(f"Updated record with remaining {len(activities)} activities")
 
-        logger.info(f"Activity deleted successfully for user: {user_id} with activityId: {activity_id}")
+        logger.info(f"Activity deleted successfully for user: {user_id} on date: {date} with activityId: {activity_id}")
         return {
             "success": True,
             "message": f"活動ID {activity_id} を削除しました",
             "activityId": activity_id,
-            "date": target_date,
+            "date": date,
             "deletedActivity": deleted_activity,
-            "remainingCount": len(activities) if activity_found else 0
+            "remainingCount": len(activities)
         }
 
     except ClientError as e:

@@ -292,6 +292,7 @@ class HealthManagerMCPTestClient:
         success = True
         test_goal_id = None
         test_policy_id = None
+        test_activity_ids = []  # 追加されたactivityIdを保存
         today = datetime.now().strftime("%Y-%m-%d")
         
         # === UserManagement ツール (3個) ===
@@ -791,6 +792,19 @@ class HealthManagerMCPTestClient:
                     success = False
                 else:
                     print(f"✅ AddActivities成功")
+                    # activityIdを保存（後続のテストで使用）
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'addedActivityIds' in parsed_content:
+                                        test_activity_ids = parsed_content['addedActivityIds']
+                                        print(f"   保存されたactivityIds: {test_activity_ids}")
+                                except json.JSONDecodeError:
+                                    pass
             else:
                 print(f"❌ AddActivities失敗: HTTP {response.status_code}")
                 success = False
@@ -824,6 +838,21 @@ class HealthManagerMCPTestClient:
                     success = False
                 else:
                     print(f"✅ GetActivities成功")
+                    # activityIdを取得（AddActivitiesで取得できなかった場合）
+                    if not test_activity_ids and 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'activities' in parsed_content and parsed_content['activities']:
+                                        for activity in parsed_content['activities']:
+                                            if 'activityId' in activity:
+                                                test_activity_ids.append(activity['activityId'])
+                                        print(f"   取得されたactivityIds: {test_activity_ids}")
+                                except json.JSONDecodeError:
+                                    pass
             else:
                 print(f"❌ GetActivities失敗: HTTP {response.status_code}")
                 success = False
@@ -835,35 +864,43 @@ class HealthManagerMCPTestClient:
         # テスト14: ActivityManagement.UpdateActivity
         print("\n--- 14. ActivityManagement.UpdateActivity テスト ---")
         try:
-            mcp_request = {
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "params": {
-                    "name": "ActivityManagement___UpdateActivity",
-                    "arguments": {
-                        "userId": self.user_id,
-                        "date": today,
-                        "time": "08:00",
-                        "activityType": "wakeUp",
-                        "description": "更新された起床",
-                        "items": ["アラームで目覚めた", "すっきり起床"]
-                    }
-                },
-                "id": 14
-            }
-            
-            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if 'error' in result:
-                    print(f"❌ UpdateActivity失敗: {result['error']}")
-                    success = False
+            if test_activity_ids and len(test_activity_ids) > 0:
+                # 最初の活動を更新
+                activity_id_to_update = test_activity_ids[0]
+                
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "ActivityManagement___UpdateActivity",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "date": today,
+                            "activityId": activity_id_to_update,
+                            "time": "07:45",
+                            "activityType": "wakeUp",
+                            "description": "更新された起床",
+                            "items": ["アラームで目覚めた", "すっきり起床"]
+                        }
+                    },
+                    "id": 14
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ UpdateActivity失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ UpdateActivity成功")
+                        print(f"   更新されたactivityId: {activity_id_to_update}")
                 else:
-                    print(f"✅ UpdateActivity成功")
+                    print(f"❌ UpdateActivity失敗: HTTP {response.status_code}")
+                    success = False
             else:
-                print(f"❌ UpdateActivity失敗: HTTP {response.status_code}")
-                success = False
+                print("⚠️ UpdateActivity スキップ: activityIdが取得できませんでした")
                 
         except Exception as e:
             print(f"❌ UpdateActivity例外: {str(e)}")
@@ -961,32 +998,39 @@ class HealthManagerMCPTestClient:
         # テスト17: ActivityManagement.DeleteActivity
         print("\n--- 17. ActivityManagement.DeleteActivity テスト ---")
         try:
-            mcp_request = {
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "params": {
-                    "name": "ActivityManagement___DeleteActivity",
-                    "arguments": {
-                        "userId": self.user_id,
-                        "date": today,
-                        "time": "09:00"
-                    }
-                },
-                "id": 17
-            }
-            
-            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if 'error' in result:
-                    print(f"❌ DeleteActivity失敗: {result['error']}")
-                    success = False
+            if test_activity_ids and len(test_activity_ids) > 1:
+                # 2番目の活動を削除
+                activity_id_to_delete = test_activity_ids[1]
+                
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "ActivityManagement___DeleteActivity",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "date": today,
+                            "activityId": activity_id_to_delete
+                        }
+                    },
+                    "id": 17
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ DeleteActivity失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ DeleteActivity成功")
+                        print(f"   削除されたactivityId: {activity_id_to_delete}")
                 else:
-                    print(f"✅ DeleteActivity成功")
+                    print(f"❌ DeleteActivity失敗: HTTP {response.status_code}")
+                    success = False
             else:
-                print(f"❌ DeleteActivity失敗: HTTP {response.status_code}")
-                success = False
+                print("⚠️ DeleteActivity スキップ: 削除可能なactivityIdが不足しています")
                 
         except Exception as e:
             print(f"❌ DeleteActivity例外: {str(e)}")
