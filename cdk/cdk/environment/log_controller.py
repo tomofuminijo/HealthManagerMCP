@@ -63,6 +63,11 @@ class LogController:
             'environment': self.environment
         })
         return logger
+    
+    def get_log_level(self) -> str:
+        """現在の環境に対応するログレベル文字列を取得"""
+        log_level_int = self.LOG_LEVELS.get(self.environment, logging.INFO)
+        return logging.getLevelName(log_level_int)
 
 
 class DevFormatter(logging.Formatter):

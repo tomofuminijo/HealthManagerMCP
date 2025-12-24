@@ -18,10 +18,18 @@ AgentCore Gateway（MCP）から呼び出され、DynamoDBで活動記録のCRUD
 import json
 import os
 import uuid
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Literal
 import boto3
 from botocore.exceptions import ClientError
+
+# ログ設定
+log_level = os.environ.get("LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, log_level.upper()))
+
+# CloudWatch Logsハンドラーが自動的に設定されるため、追加設定は不要
 
 # DynamoDBクライアント（指数バックオフ付き再試行設定）
 from botocore.config import Config
@@ -67,7 +75,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         MCP形式のレスポンス
     """
-    print(f"[ActivityLambda] Received event: {json.dumps(event, default=str)}")
+    logger.debug(f"Received event: {json.dumps(event, default=str)}")
 
     try:
         # AgentCore Gateway（MCP）形式のイベントを処理
@@ -78,11 +86,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("userId is required for all activity operations")
         
         user_id = parameters["userId"]
-        print(f"[ActivityLambda] Processing request for userId: {user_id}")
+        logger.info(f"Processing request for userId: {user_id}")
         
         # contextからツール名を取得
         tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
-        print(f"[ActivityLambda] Tool name from context: {tool_name}")
+        logger.debug(f"Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddActivities":
@@ -100,13 +108,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             raise ValueError(f"Unknown operation: {tool_name}")
         
-        print(f"[ActivityLambda] Operation completed successfully: {tool_name}")
+        logger.info(f"Operation completed successfully: {tool_name}")
         return result
 
     except ValueError as e:
         # バリデーションエラー
         error_msg = f"Validation error: {str(e)}"
-        print(f"[ActivityLambda] {error_msg}")
+        logger.warning(error_msg)
         return {
             "success": False,
             "error": error_msg,
@@ -116,7 +124,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # DynamoDBエラー
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         error_msg = f"Database error ({error_code}): {str(e)}"
-        print(f"[ActivityLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "データベースエラーが発生しました。しばらくしてから再度お試しください。",
@@ -126,7 +134,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         # その他のエラー
         error_msg = f"Unexpected error: {str(e)}"
-        print(f"[ActivityLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "予期しないエラーが発生しました。しばらくしてから再度お試しください。",
@@ -159,7 +167,7 @@ def add_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not activities or not isinstance(activities, list):
         raise ValueError("activities must be a non-empty list")
 
-    print(f"[ActivityLambda] Adding {len(activities)} activities for user: {user_id} on date: {date}")
+    logger.debug(f"Adding {len(activities)} activities for user: {user_id} on date: {date}")
 
     # 各活動の検証とactivityIdの自動生成
     for idx, activity in enumerate(activities):
@@ -199,7 +207,7 @@ def add_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     ":updatedAt": now,
                 },
             )
-            print(f"[ActivityLambda] Added {len(activities)} activities to existing record")
+            logger.debug(f"Added {len(activities)} activities to existing record")
         else:
             # 新しいレコードを作成
             table.put_item(
@@ -211,12 +219,12 @@ def add_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     "updatedAt": now,
                 }
             )
-            print(f"[ActivityLambda] Created new record with {len(activities)} activities")
+            logger.debug(f"Created new record with {len(activities)} activities")
 
         # 生成されたactivityIdを含むレスポンス
         added_activity_ids = [activity["activityId"] for activity in activities]
         
-        print(f"[ActivityLambda] Activities added successfully for user: {user_id} on date: {date}")
+        logger.info(f"Activities added successfully for user: {user_id} on date: {date}")
         return {
             "success": True,
             "message": f"{date}に{len(activities)}件の活動を追加しました",
@@ -228,7 +236,7 @@ def add_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[ActivityLambda] DynamoDB error in add_activities: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in add_activities: {error_code} - {str(e)}")
         raise
 
 
@@ -258,7 +266,7 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not activity_id:
         raise ValueError("activityId is required")
 
-    print(f"[ActivityLambda] Updating activity for user: {user_id} with activityId: {activity_id}")
+    logger.debug(f"Updating activity for user: {user_id} with activityId: {activity_id}")
 
     # itemsが文字列の場合はリストに変換
     if isinstance(items, str):
@@ -319,7 +327,7 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not activity_found:
             raise ValueError(f"Activity with activityId: {activity_id} not found")
 
-        print(f"[ActivityLambda] Activity updated successfully for user: {user_id} with activityId: {activity_id}")
+        logger.info(f"Activity updated successfully for user: {user_id} with activityId: {activity_id}")
         return {
             "success": True,
             "message": f"活動ID {activity_id} を更新しました",
@@ -330,7 +338,7 @@ def update_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[ActivityLambda] DynamoDB error in update_activity: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in update_activity: {error_code} - {str(e)}")
         raise
 
 
@@ -359,7 +367,7 @@ def update_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(activities, list):
         raise ValueError("activities must be a list")
 
-    print(f"[ActivityLambda] Replacing all activities for user: {user_id} on date: {date} with {len(activities)} activities")
+    logger.debug(f"Replacing all activities for user: {user_id} on date: {date} with {len(activities)} activities")
 
     # 各活動の検証とactivityIdの自動生成
     for idx, activity in enumerate(activities):
@@ -397,7 +405,7 @@ def update_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     ":updatedAt": now,
                 },
             )
-            print(f"[ActivityLambda] Replaced existing activities")
+            logger.debug(f"Replaced existing activities")
         else:
             # 新しいレコードを作成
             table.put_item(
@@ -409,12 +417,12 @@ def update_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     "updatedAt": now,
                 }
             )
-            print(f"[ActivityLambda] Created new record")
+            logger.debug(f"Created new record")
 
         # 生成されたactivityIdを含むレスポンス
         activity_ids = [activity["activityId"] for activity in activities]
 
-        print(f"[ActivityLambda] Activities updated successfully for user: {user_id} on date: {date}")
+        logger.info(f"Activities updated successfully for user: {user_id} on date: {date}")
         return {
             "success": True,
             "message": f"{date}の活動を{len(activities)}件に更新しました",
@@ -426,7 +434,7 @@ def update_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[ActivityLambda] DynamoDB error in update_activities: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in update_activities: {error_code} - {str(e)}")
         raise
 
 
@@ -452,7 +460,7 @@ def delete_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not activity_id:
         raise ValueError("activityId is required")
 
-    print(f"[ActivityLambda] Deleting activity for user: {user_id} with activityId: {activity_id}")
+    logger.debug(f"Deleting activity for user: {user_id} with activityId: {activity_id}")
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -491,7 +499,7 @@ def delete_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     if len(activities) == 0:
                         # すべての活動が削除された場合、レコード自体を削除
                         table.delete_item(Key={"userId": user_id, "date": search_date})
-                        print(f"[ActivityLambda] Deleted entire record (last activity removed)")
+                        logger.debug(f"Deleted entire record (last activity removed)")
                     else:
                         # 更新されたリストを保存
                         table.update_item(
@@ -502,13 +510,13 @@ def delete_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
                                 ":updatedAt": now,
                             },
                         )
-                        print(f"[ActivityLambda] Updated record with remaining {len(activities)} activities")
+                        logger.debug(f"Updated record with remaining {len(activities)} activities")
                     break
 
         if not activity_found:
             raise ValueError(f"Activity with activityId: {activity_id} not found")
 
-        print(f"[ActivityLambda] Activity deleted successfully for user: {user_id} with activityId: {activity_id}")
+        logger.info(f"Activity deleted successfully for user: {user_id} with activityId: {activity_id}")
         return {
             "success": True,
             "message": f"活動ID {activity_id} を削除しました",
@@ -520,7 +528,7 @@ def delete_activity(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[ActivityLambda] DynamoDB error in delete_activity: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in delete_activity: {error_code} - {str(e)}")
         raise
 
 
@@ -546,14 +554,14 @@ def get_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not date:
         raise ValueError("date is required")
 
-    print(f"[ActivityLambda] Retrieving activities for user: {user_id} on date: {date}")
+    logger.debug(f"Retrieving activities for user: {user_id} on date: {date}")
 
     try:
         response = table.get_item(Key={"userId": user_id, "date": date})
 
         if "Item" in response:
             activities = response["Item"].get("activities", [])
-            print(f"[ActivityLambda] Retrieved {len(activities)} activities for user: {user_id} on date: {date}")
+            logger.info(f"Retrieved {len(activities)} activities for user: {user_id} on date: {date}")
             return {
                 "success": True,
                 "date": date,
@@ -561,7 +569,7 @@ def get_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
                 "count": len(activities),
             }
         else:
-            print(f"[ActivityLambda] No activities found for user: {user_id} on date: {date}")
+            logger.info(f"No activities found for user: {user_id} on date: {date}")
             return {
                 "success": True,
                 "date": date,
@@ -571,7 +579,7 @@ def get_activities(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[ActivityLambda] DynamoDB error in get_activities: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_activities: {error_code} - {str(e)}")
         raise
 
 
@@ -600,7 +608,7 @@ def get_activities_in_range(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not end_date:
         raise ValueError("endDate is required")
 
-    print(f"[ActivityLambda] Retrieving activities for user: {user_id} from {start_date} to {end_date}")
+    logger.debug(f"Retrieving activities for user: {user_id} from {start_date} to {end_date}")
 
     # 日付の妥当性チェック
     try:
@@ -645,7 +653,7 @@ def get_activities_in_range(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # 日付順にソート
         daily_activities.sort(key=lambda x: x["date"])
 
-        print(f"[ActivityLambda] Retrieved activities for user: {user_id} - {len(daily_activities)} days, {total_activities} total activities")
+        logger.info(f"Retrieved activities for user: {user_id} - {len(daily_activities)} days, {total_activities} total activities")
         return {
             "success": True,
             "userId": user_id,
@@ -659,5 +667,5 @@ def get_activities_in_range(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[ActivityLambda] DynamoDB error in get_activities_in_range: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_activities_in_range: {error_code} - {str(e)}")
         raise

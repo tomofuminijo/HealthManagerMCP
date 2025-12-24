@@ -15,10 +15,18 @@ AgentCore Gateway（MCP）から呼び出され、DynamoDBでユーザー情報�
 import json
 import os
 import re
+import logging
 from datetime import datetime, timezone, date
 from typing import Any, Dict
 import boto3
 from botocore.exceptions import ClientError
+
+# ログ設定
+log_level = os.environ.get("LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, log_level.upper()))
+
+# CloudWatch Logsハンドラーが自動的に設定されるため、追加設定は不要
 
 # DynamoDBクライアント（指数バックオフ付き再試行設定）
 from botocore.config import Config
@@ -49,7 +57,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         MCP形式のレスポンス
     """
-    print(f"[UserLambda] Received event: {json.dumps(event, default=str)}")
+    logger.debug(f"Received event: {json.dumps(event, default=str)}")
 
     try:
         # AgentCore Gateway（MCP）形式のイベントを処理
@@ -61,11 +69,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("userId is required for all user operations")
         
         user_id = parameters["userId"]
-        print(f"[UserLambda] Processing request for userId: {user_id}")
+        logger.info(f"Processing request for userId: {user_id}")
         
         # contextからツール名を取得
         tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
-        print(f"[UserLambda] Tool name from context: {tool_name}")
+        logger.debug(f"Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddUser":
@@ -77,13 +85,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             raise ValueError(f"Unknown operation: {tool_name}")
         
-        print(f"[UserLambda] Operation completed successfully: {tool_name}")
+        logger.info(f"Operation completed successfully: {tool_name}")
         return result
 
     except ValueError as e:
         # バリデーションエラー
         error_msg = f"Validation error: {str(e)}"
-        print(f"[UserLambda] {error_msg}")
+        logger.warning(error_msg)
         return {
             "success": False,
             "error": error_msg,
@@ -93,7 +101,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # DynamoDBエラー
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         error_msg = f"Database error ({error_code}): {str(e)}"
-        print(f"[UserLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "データベースエラーが発生しました。しばらくしてから再度お試しください。",
@@ -103,7 +111,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         # その他のエラー
         error_msg = f"Unexpected error: {str(e)}"
-        print(f"[UserLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "予期しないエラーが発生しました。しばらくしてから再度お試しください。",
@@ -140,9 +148,9 @@ def add_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     # 生年月日のバリデーション（提供された場合のみ）
     if date_of_birth is not None:
         validate_date_of_birth(date_of_birth)
-        print(f"[UserLambda] Date of birth validated: {date_of_birth}")
+        logger.debug(f"Date of birth validated: {date_of_birth}")
 
-    print(f"[UserLambda] Adding/updating user: {user_id}, username: {username}")
+    logger.info(f"Adding/updating user: {user_id}, username: {username}")
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -167,17 +175,17 @@ def add_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
             # 既存ユーザーの場合は更新
             existing_item = existing_response["Item"]
             item["createdAt"] = existing_item.get("createdAt", now)  # 作成日時は保持
-            print(f"[UserLambda] Updating existing user: {user_id}")
+            logger.info(f"Updating existing user: {user_id}")
             operation = "updated"
         else:
             # 新規ユーザーの場合
-            print(f"[UserLambda] Creating new user: {user_id}")
+            logger.info(f"Creating new user: {user_id}")
             operation = "created"
 
         # アイテムを保存
         table.put_item(Item=item)
         
-        print(f"[UserLambda] User {operation} successfully: {user_id}")
+        logger.info(f"User {operation} successfully: {user_id}")
         
         # レスポンス用のユーザー情報を構築
         user_response = {
@@ -201,7 +209,7 @@ def add_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[UserLambda] DynamoDB error in add_user: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in add_user: {error_code} - {str(e)}")
         raise
 
 
@@ -228,7 +236,7 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not user_id:
         raise ValueError("userId is required")
 
-    print(f"[UserLambda] Updating user: {user_id}")
+    logger.info(f"Updating user: {user_id}")
 
     # 更新式を構築
     update_expression_parts = []
@@ -238,35 +246,35 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if username is not None:
         update_expression_parts.append("username = :username")
         expression_attribute_values[":username"] = username
-        print(f"[UserLambda] Updating username to: {username}")
+        logger.debug(f"Updating username to: {username}")
 
     if email is not None:
         update_expression_parts.append("email = :email")
         expression_attribute_values[":email"] = email
-        print(f"[UserLambda] Updating email to: {email}")
+        logger.debug(f"Updating email to: {email}")
 
     # 生年月日の処理
     if date_of_birth is not None:
         if date_of_birth == "":  # 空文字列の場合は削除
             remove_expression_parts.append("dateOfBirth")
-            print(f"[UserLambda] Removing dateOfBirth field")
+            logger.debug("Removing dateOfBirth field")
         else:
             # 生年月日の検証
             validate_date_of_birth(date_of_birth)
             update_expression_parts.append("dateOfBirth = :dateOfBirth")
             expression_attribute_values[":dateOfBirth"] = date_of_birth
-            print(f"[UserLambda] Updating dateOfBirth to: {date_of_birth}")
+            logger.debug(f"Updating dateOfBirth to: {date_of_birth}")
 
     if last_login_at is not None:
         update_expression_parts.append("lastLoginAt = :lastLoginAt")
         expression_attribute_values[":lastLoginAt"] = last_login_at
-        print(f"[UserLambda] Updating lastLoginAt to: {last_login_at}")
+        logger.debug(f"Updating lastLoginAt to: {last_login_at}")
     else:
         # lastLoginAtが指定されていない場合は現在時刻を設定
         now = datetime.now(timezone.utc).isoformat()
         update_expression_parts.append("lastLoginAt = :lastLoginAt")
         expression_attribute_values[":lastLoginAt"] = now
-        print(f"[UserLambda] Setting lastLoginAt to current time: {now}")
+        logger.debug(f"Setting lastLoginAt to current time: {now}")
 
     # 更新対象フィールドがない場合はエラー
     if not update_expression_parts and not remove_expression_parts:
@@ -292,7 +300,7 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         updated_user = response["Attributes"]
-        print(f"[UserLambda] User updated successfully: {user_id}")
+        logger.info(f"User updated successfully: {user_id}")
         
         # レスポンス用のユーザー情報を構築
         user_response = {
@@ -317,10 +325,10 @@ def update_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if error_code == "ConditionalCheckFailedException":
-            print(f"[UserLambda] User not found for update: {user_id}")
+            logger.warning(f"User not found for update: {user_id}")
             raise ValueError(f"User not found: {user_id}")
         else:
-            print(f"[UserLambda] DynamoDB error in update_user: {error_code} - {str(e)}")
+            logger.error(f"DynamoDB error in update_user: {error_code} - {str(e)}")
             raise
 
 
@@ -343,14 +351,14 @@ def get_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not user_id:
         raise ValueError("userId is required")
 
-    print(f"[UserLambda] Retrieving user: {user_id}")
+    logger.info(f"Retrieving user: {user_id}")
 
     try:
         response = table.get_item(Key={"userId": user_id})
 
         if "Item" in response:
             user = response["Item"]
-            print(f"[UserLambda] User retrieved successfully: {user_id}")
+            logger.info(f"User retrieved successfully: {user_id}")
             
             # レスポンス用のユーザー情報を構築
             user_response = {
@@ -364,16 +372,16 @@ def get_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
             # 生年月日が存在する場合のみレスポンスに含める（後方互換性を維持）
             if "dateOfBirth" in user:
                 user_response["dateOfBirth"] = user["dateOfBirth"]
-                print(f"[UserLambda] Including dateOfBirth in response: {user['dateOfBirth']}")
+                logger.debug(f"Including dateOfBirth in response: {user['dateOfBirth']}")
             else:
-                print(f"[UserLambda] No dateOfBirth found for user: {user_id}")
+                logger.debug(f"No dateOfBirth found for user: {user_id}")
             
             return {
                 "success": True,
                 "user": user_response
             }
         else:
-            print(f"[UserLambda] User not found: {user_id}")
+            logger.info(f"User not found: {user_id}")
             return {
                 "success": False,
                 "message": "ユーザーが見つかりません",
@@ -382,7 +390,7 @@ def get_user(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[UserLambda] DynamoDB error in get_user: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_user: {error_code} - {str(e)}")
         raise
 
 

@@ -16,10 +16,18 @@ AgentCore Gateway（MCP）から呼び出され、DynamoDBで健康ポリシー�
 import json
 import os
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Literal, Optional
 import boto3
 from botocore.exceptions import ClientError
+
+# ログ設定
+log_level = os.environ.get("LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, log_level.upper()))
+
+# CloudWatch Logsハンドラーが自動的に設定されるため、追加設定は不要
 
 # DynamoDBクライアント（指数バックオフ付き再試行設定）
 from botocore.config import Config
@@ -53,7 +61,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         MCP形式のレスポンス
     """
-    print(f"[HealthPolicyLambda] Received event: {json.dumps(event, default=str)}")
+    logger.debug(f"Received event: {json.dumps(event, default=str)}")
 
     try:
         # AgentCore Gateway（MCP）形式のイベントを処理
@@ -64,11 +72,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("userId is required for all health policy operations")
         
         user_id = parameters["userId"]
-        print(f"[HealthPolicyLambda] Processing request for userId: {user_id}")
+        logger.info(f"Processing request for userId: {user_id}")
         
         # contextからツール名を取得
         tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
-        print(f"[HealthPolicyLambda] Tool name from context: {tool_name}")
+        logger.debug(f"Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddPolicy":
@@ -82,13 +90,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             raise ValueError(f"Unknown operation: {tool_name}")
         
-        print(f"[HealthPolicyLambda] Operation completed successfully: {tool_name}")
+        logger.info(f"Operation completed successfully: {tool_name}")
         return result
 
     except ValueError as e:
         # バリデーションエラー
         error_msg = f"Validation error: {str(e)}"
-        print(f"[HealthPolicyLambda] {error_msg}")
+        logger.warning(error_msg)
         return {
             "success": False,
             "error": error_msg,
@@ -98,7 +106,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # DynamoDBエラー
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         error_msg = f"Database error ({error_code}): {str(e)}"
-        print(f"[HealthPolicyLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "データベースエラーが発生しました。しばらくしてから再度お試しください。",
@@ -108,7 +116,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         # その他のエラー
         error_msg = f"Unexpected error: {str(e)}"
-        print(f"[HealthPolicyLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "予期しないエラーが発生しました。しばらくしてから再度お試しください。",
@@ -158,7 +166,7 @@ def add_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
     policy_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    print(f"[HealthPolicyLambda] Creating policy: {policy_id} for user: {user_id}")
+    logger.debug(f"Creating policy: {policy_id} for user: {user_id}")
 
     # DynamoDBアイテムを構築
     item = {
@@ -183,7 +191,7 @@ def add_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # DynamoDBに保存
         table.put_item(Item=item)
         
-        print(f"[HealthPolicyLambda] Policy created successfully: {policy_id}")
+        logger.info(f"Policy created successfully: {policy_id}")
         return {
             "success": True,
             "policyId": policy_id,
@@ -193,7 +201,7 @@ def add_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[HealthPolicyLambda] DynamoDB error in add_policy: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in add_policy: {error_code} - {str(e)}")
         raise
 
 
@@ -226,7 +234,7 @@ def update_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not policy_id:
         raise ValueError("policyId is required")
 
-    print(f"[HealthPolicyLambda] Updating policy: {policy_id} for user: {user_id}")
+    logger.debug(f"Updating policy: {policy_id} for user: {user_id}")
 
     # 更新式を構築
     update_expression_parts = []
@@ -278,7 +286,7 @@ def update_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         updated_policy = response["Attributes"]
-        print(f"[HealthPolicyLambda] Policy updated successfully: {policy_id}")
+        logger.info(f"Policy updated successfully: {policy_id}")
         
         return {
             "success": True,
@@ -290,10 +298,10 @@ def update_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if error_code == "ConditionalCheckFailedException":
-            print(f"[HealthPolicyLambda] Policy not found for update: {policy_id}")
+            logger.warning(f"Policy not found for update: {policy_id}")
             raise ValueError(f"Policy not found: {policy_id}")
         else:
-            print(f"[HealthPolicyLambda] DynamoDB error in update_policy: {error_code} - {str(e)}")
+            logger.error(f"DynamoDB error in update_policy: {error_code} - {str(e)}")
             raise
 
 
@@ -319,7 +327,7 @@ def delete_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not policy_id:
         raise ValueError("policyId is required")
 
-    print(f"[HealthPolicyLambda] Deleting policy: {policy_id} for user: {user_id}")
+    logger.debug(f"Deleting policy: {policy_id} for user: {user_id}")
 
     try:
         # ポリシーが存在することを確認しながら削除
@@ -330,7 +338,7 @@ def delete_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         deleted_policy = response.get("Attributes")
-        print(f"[HealthPolicyLambda] Policy deleted successfully: {policy_id}")
+        logger.info(f"Policy deleted successfully: {policy_id}")
         
         return {
             "success": True,
@@ -342,10 +350,10 @@ def delete_policy(parameters: Dict[str, Any]) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if error_code == "ConditionalCheckFailedException":
-            print(f"[HealthPolicyLambda] Policy not found for deletion: {policy_id}")
+            logger.warning(f"Policy not found for deletion: {policy_id}")
             raise ValueError(f"Policy not found: {policy_id}")
         else:
-            print(f"[HealthPolicyLambda] DynamoDB error in delete_policy: {error_code} - {str(e)}")
+            logger.error(f"DynamoDB error in delete_policy: {error_code} - {str(e)}")
             raise
 
 
@@ -368,7 +376,7 @@ def get_policies(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not user_id:
         raise ValueError("userId is required")
 
-    print(f"[HealthPolicyLambda] Retrieving policies for user: {user_id}")
+    logger.debug(f"Retrieving policies for user: {user_id}")
 
     try:
         # userIdでクエリしてすべてのポリシーを取得
@@ -378,7 +386,7 @@ def get_policies(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         policies = response.get("Items", [])
-        print(f"[HealthPolicyLambda] Retrieved {len(policies)} policies for user: {user_id}")
+        logger.info(f"Retrieved {len(policies)} policies for user: {user_id}")
 
         return {
             "success": True,
@@ -389,5 +397,5 @@ def get_policies(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[HealthPolicyLambda] DynamoDB error in get_policies: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_policies: {error_code} - {str(e)}")
         raise

@@ -16,10 +16,18 @@ AgentCore Gateway（MCP）から呼び出され、DynamoDBで健康目標のCRUD
 import json
 import os
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 import boto3
 from botocore.exceptions import ClientError
+
+# ログ設定
+log_level = os.environ.get("LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, log_level.upper()))
+
+# CloudWatch Logsハンドラーが自動的に設定されるため、追加設定は不要
 
 # DynamoDBクライアント（指数バックオフ付き再試行設定）
 from botocore.config import Config
@@ -54,7 +62,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         MCP形式のレスポンス
     """
-    print(f"[HealthGoalLambda] Received event: {json.dumps(event, default=str)}")
+    logger.debug(f"Received event: {json.dumps(event, default=str)}")
 
     try:
         # AgentCore Gateway（MCP）形式のイベントを処理
@@ -65,11 +73,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("userId is required for all health goal operations")
         
         user_id = parameters["userId"]
-        print(f"[HealthGoalLambda] Processing request for userId: {user_id}")
+        logger.info(f"Processing request for userId: {user_id}")
         
         # contextからツール名を取得
         tool_name = context.client_context.custom['bedrockAgentCoreToolName'].split('___', 1)[-1]
-        print(f"[HealthGoalLambda] Tool name from context: {tool_name}")
+        logger.debug(f"Tool name from context: {tool_name}")
         
         # ツールに基づいて関数を実行
         if tool_name == "AddGoal":
@@ -83,13 +91,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             raise ValueError(f"Unknown operation: {tool_name}")
         
-        print(f"[HealthGoalLambda] Operation completed successfully: {tool_name}")
+        logger.info(f"Operation completed successfully: {tool_name}")
         return result
 
     except ValueError as e:
         # バリデーションエラー
         error_msg = f"Validation error: {str(e)}"
-        print(f"[HealthGoalLambda] {error_msg}")
+        logger.warning(error_msg)
         return {
             "success": False,
             "error": error_msg,
@@ -99,7 +107,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # DynamoDBエラー
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         error_msg = f"Database error ({error_code}): {str(e)}"
-        print(f"[HealthGoalLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "データベースエラーが発生しました。しばらくしてから再度お試しください。",
@@ -109,7 +117,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         # その他のエラー
         error_msg = f"Unexpected error: {str(e)}"
-        print(f"[HealthGoalLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "予期しないエラーが発生しました。しばらくしてから再度お試しください。",
@@ -163,7 +171,7 @@ def add_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
     goal_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    print(f"[HealthGoalLambda] Creating goal: {goal_id} for user: {user_id}")
+    logger.debug(f"Creating goal: {goal_id} for user: {user_id}")
 
     # DynamoDBアイテムを構築
     item = {
@@ -188,7 +196,7 @@ def add_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # DynamoDBに保存
         table.put_item(Item=item)
         
-        print(f"[HealthGoalLambda] Goal created successfully: {goal_id}")
+        logger.info(f"Goal created successfully: {goal_id}")
         return {
             "success": True,
             "goalId": goal_id,
@@ -198,7 +206,7 @@ def add_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[HealthGoalLambda] DynamoDB error in add_goal: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in add_goal: {error_code} - {str(e)}")
         raise
 
 
@@ -231,7 +239,7 @@ def update_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not goal_id:
         raise ValueError("goalId is required")
 
-    print(f"[HealthGoalLambda] Updating goal: {goal_id} for user: {user_id}")
+    logger.debug(f"Updating goal: {goal_id} for user: {user_id}")
 
     # 更新式を構築
     update_expression_parts = []
@@ -297,7 +305,7 @@ def update_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
         response = table.update_item(**update_params)
         
         updated_goal = response["Attributes"]
-        print(f"[HealthGoalLambda] Goal updated successfully: {goal_id}")
+        logger.info(f"Goal updated successfully: {goal_id}")
         
         return {
             "success": True,
@@ -309,10 +317,10 @@ def update_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if error_code == "ConditionalCheckFailedException":
-            print(f"[HealthGoalLambda] Goal not found for update: {goal_id}")
+            logger.warning(f"Goal not found for update: {goal_id}")
             raise ValueError(f"Goal not found: {goal_id}")
         else:
-            print(f"[HealthGoalLambda] DynamoDB error in update_goal: {error_code} - {str(e)}")
+            logger.error(f"DynamoDB error in update_goal: {error_code} - {str(e)}")
             raise
 
 
@@ -338,7 +346,7 @@ def delete_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not goal_id:
         raise ValueError("goalId is required")
 
-    print(f"[HealthGoalLambda] Deleting goal: {goal_id} for user: {user_id}")
+    logger.debug(f"Deleting goal: {goal_id} for user: {user_id}")
 
     try:
         # 目標が存在することを確認しながら削除
@@ -349,7 +357,7 @@ def delete_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         deleted_goal = response.get("Attributes")
-        print(f"[HealthGoalLambda] Goal deleted successfully: {goal_id}")
+        logger.info(f"Goal deleted successfully: {goal_id}")
         
         return {
             "success": True,
@@ -361,10 +369,10 @@ def delete_goal(parameters: Dict[str, Any]) -> Dict[str, Any]:
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         if error_code == "ConditionalCheckFailedException":
-            print(f"[HealthGoalLambda] Goal not found for deletion: {goal_id}")
+            logger.warning(f"Goal not found for deletion: {goal_id}")
             raise ValueError(f"Goal not found: {goal_id}")
         else:
-            print(f"[HealthGoalLambda] DynamoDB error in delete_goal: {error_code} - {str(e)}")
+            logger.error(f"DynamoDB error in delete_goal: {error_code} - {str(e)}")
             raise
 
 
@@ -387,7 +395,7 @@ def get_goals(parameters: Dict[str, Any]) -> Dict[str, Any]:
     if not user_id:
         raise ValueError("userId is required")
 
-    print(f"[HealthGoalLambda] Retrieving goals for user: {user_id}")
+    logger.debug(f"Retrieving goals for user: {user_id}")
 
     try:
         # userIdでクエリしてすべての目標を取得
@@ -397,7 +405,7 @@ def get_goals(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         goals = response.get("Items", [])
-        print(f"[HealthGoalLambda] Retrieved {len(goals)} goals for user: {user_id}")
+        logger.info(f"Retrieved {len(goals)} goals for user: {user_id}")
         
         return {
             "success": True,
@@ -408,5 +416,5 @@ def get_goals(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[HealthGoalLambda] DynamoDB error in get_goals: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_goals: {error_code} - {str(e)}")
         raise

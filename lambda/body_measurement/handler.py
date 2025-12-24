@@ -26,6 +26,13 @@ from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
 
+# ログ設定
+log_level = os.environ.get("LOG_LEVEL", "INFO")
+logger = logging.getLogger(__name__)
+logger.setLevel(getattr(logging, log_level.upper()))
+
+# CloudWatch Logsハンドラーが自動的に設定されるため、追加設定は不要
+
 # DynamoDBクライアント（指数バックオフ付き再試行設定）
 from botocore.config import Config
 
@@ -55,8 +62,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         MCP形式のレスポンス
     """
-    print(f"[BodyMeasurementLambda] Received event: {json.dumps(event, default=str)}")
-    print(f"[BodyMeasurementLambda] Context: {context}")
+    logger.debug(f"Received event: {json.dumps(event, default=str)}")
+    logger.debug(f"Context: {context}")
 
     try:
         # AgentCore Gateway（MCP）形式のイベントを処理
@@ -67,7 +74,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("userId is required for all body measurement operations")
         
         user_id = parameters["userId"]
-        print(f"[BodyMeasurementLambda] Processing request for userId: {user_id}")
+        logger.info(f"Processing request for userId: {user_id}")
         
         # ツール名の取得方法を修正
         tool_name = None
@@ -76,14 +83,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         try:
             if hasattr(context, 'client_context') and context.client_context and hasattr(context.client_context, 'custom'):
                 tool_name = context.client_context.custom.get('bedrockAgentCoreToolName', '').split('___', 1)[-1]
-                print(f"[BodyMeasurementLambda] Tool name from context: {tool_name}")
+                logger.debug(f"Tool name from context: {tool_name}")
         except Exception as e:
-            print(f"[BodyMeasurementLambda] Could not get tool name from context: {e}")
+            logger.debug(f"Could not get tool name from context: {e}")
         
         # 方法2: eventからツール名を取得（フォールバック）
         if not tool_name:
             tool_name = event.get('tool_name') or event.get('toolName')
-            print(f"[BodyMeasurementLambda] Tool name from event: {tool_name}")
+            logger.debug(f"Tool name from event: {tool_name}")
         
         # 方法3: Lambda関数名から推測（最終フォールバック）
         if not tool_name:
@@ -91,7 +98,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if 'body-measurement' in function_name.lower():
                 # デフォルトでAddBodyMeasurementを使用（テスト用）
                 tool_name = "AddBodyMeasurement"
-                print(f"[BodyMeasurementLambda] Using default tool name: {tool_name}")
+                logger.debug(f"Using default tool name: {tool_name}")
         
         if not tool_name:
             raise ValueError("Could not determine tool name from context or event")
@@ -112,13 +119,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         else:
             raise ValueError(f"Unknown operation: {tool_name}")
         
-        print(f"[BodyMeasurementLambda] Operation completed successfully: {tool_name}")
+        logger.info(f"Operation completed successfully: {tool_name}")
         return result
 
     except ValueError as e:
         # バリデーションエラー
         error_msg = f"Validation error: {str(e)}"
-        print(f"[BodyMeasurementLambda] {error_msg}")
+        logger.warning(error_msg)
         return {
             "success": False,
             "error": error_msg,
@@ -128,7 +135,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # DynamoDBエラー
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
         error_msg = f"Database error ({error_code}): {str(e)}"
-        print(f"[BodyMeasurementLambda] {error_msg}")
+        logger.error(error_msg)
         return {
             "success": False,
             "error": "データベースエラーが発生しました。しばらくしてから再度お試しください。",
@@ -138,9 +145,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         # その他のエラー
         error_msg = f"Unexpected error: {str(e)}"
-        print(f"[BodyMeasurementLambda] {error_msg}")
+        logger.error(error_msg)
         import traceback
-        print(f"[BodyMeasurementLambda] Traceback: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             "success": False,
             "error": "予期しないエラーが発生しました。しばらくしてから再度お試しください。",
@@ -214,7 +221,7 @@ def add_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not user_id:
             raise ValueError("userId is required")
         
-        print(f"[BodyMeasurementLambda] Adding measurement for user: {user_id}")
+        logger.debug(f"Adding measurement for user: {user_id}")
         
         # 少なくとも一つの測定値が必要
         measurement_data = {}
@@ -249,12 +256,12 @@ def add_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         table.put_item(Item=measurement_record)
-        print(f"[BodyMeasurementLambda] Saved measurement record: {measurement_record}")
+        logger.debug(f"Saved measurement record: {measurement_record}")
         
         # Latest/Oldest レコードの更新
         update_latest_oldest_records(user_id, measurement_data, measurement_time)
         
-        print(f"[BodyMeasurementLambda] Measurement added successfully for user: {user_id}")
+        logger.info(f"Measurement added successfully for user: {user_id}")
         return {
             "success": True,
             "message": "測定値が正常に記録されました",
@@ -264,14 +271,14 @@ def add_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         }
         
     except ValueError as e:
-        print(f"[BodyMeasurementLambda] Validation error in add_body_measurement: {str(e)}")
+        logger.warning(f"Validation error in add_body_measurement: {str(e)}")
         raise
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[BodyMeasurementLambda] DynamoDB error in add_body_measurement: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in add_body_measurement: {error_code} - {str(e)}")
         raise
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Unexpected error in add_body_measurement: {str(e)}")
+        logger.error(f"Unexpected error in add_body_measurement: {str(e)}")
         raise
 
 
@@ -303,7 +310,7 @@ def update_latest_oldest_records(user_id: str, new_measurement: Dict[str, Any], 
             update_oldest_record(user_id, new_measurement, measurement_time)
             
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error updating latest/oldest records: {str(e)}")
+        logger.warning(f"Error updating latest/oldest records: {str(e)}")
         # Latest/Oldest更新エラーは警告レベルで記録（メイン処理は成功）
 
 
@@ -351,7 +358,7 @@ def handle_first_measurement(user_id: str, measurement: Dict[str, Any], measurem
     table.put_item(Item=latest_record)
     table.put_item(Item=oldest_record)
     
-    print(f"[BodyMeasurementLambda] Created initial latest/oldest records for user {user_id}")
+    logger.debug(f"Created initial latest/oldest records for user {user_id}")
 
 
 def update_latest_record(user_id: str, new_measurement: Dict[str, Any], measurement_time: str) -> None:
@@ -406,10 +413,10 @@ def update_latest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         updated_latest['updated_at'] = datetime.now(timezone.utc).isoformat()
         table.put_item(Item=updated_latest)
         
-        print(f"[BodyMeasurementLambda] Updated latest record for user {user_id}")
+        logger.debug(f"Updated latest record for user {user_id}")
         
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error updating latest record: {str(e)}")
+        logger.warning(f"Error updating latest record: {str(e)}")
 
 
 def update_oldest_record(user_id: str, new_measurement: Dict[str, Any], measurement_time: str) -> None:
@@ -464,10 +471,10 @@ def update_oldest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         
         table.put_item(Item=updated_oldest)
         
-        print(f"[BodyMeasurementLambda] Updated oldest record for user {user_id}")
+        logger.debug(f"Updated oldest record for user {user_id}")
         
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error updating oldest record: {str(e)}")
+        logger.warning(f"Error updating oldest record: {str(e)}")
 
 
 def get_all_user_measurements(user_id: str) -> list:
@@ -490,7 +497,7 @@ def get_all_user_measurements(user_id: str) -> list:
         return response['Items']
         
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error getting user measurements: {str(e)}")
+        logger.warning(f"Error getting user measurements: {str(e)}")
         return []
 
 
@@ -509,7 +516,7 @@ def get_latest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not user_id:
             raise ValueError("userId is required")
         
-        print(f"[BodyMeasurementLambda] Getting latest measurements for user: {user_id}")
+        logger.debug(f"Getting latest measurements for user: {user_id}")
         
         response = table.query(
             IndexName='RecordTypeIndex',
@@ -521,7 +528,7 @@ def get_latest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         if not response['Items']:
-            print(f"[BodyMeasurementLambda] No measurements found for user: {user_id}")
+            logger.info(f"No measurements found for user: {user_id}")
             return {
                 "success": True,
                 "message": "測定記録が見つかりません",
@@ -538,7 +545,7 @@ def get_latest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
             elif key.startswith('last_') and key.endswith('_update'):
                 result[key] = value
         
-        print(f"[BodyMeasurementLambda] Latest measurements retrieved for user: {user_id}")
+        logger.info(f"Latest measurements retrieved for user: {user_id}")
         return {
             "success": True,
             "message": "最新の測定値を取得しました",
@@ -547,10 +554,10 @@ def get_latest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[BodyMeasurementLambda] DynamoDB error in get_latest_measurements: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_latest_measurements: {error_code} - {str(e)}")
         raise
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error in get_latest_measurements: {str(e)}")
+        logger.error(f"Error in get_latest_measurements: {str(e)}")
         raise
 
 
@@ -569,7 +576,7 @@ def get_oldest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not user_id:
             raise ValueError("userId is required")
         
-        print(f"[BodyMeasurementLambda] Getting oldest measurements for user: {user_id}")
+        logger.debug(f"Getting oldest measurements for user: {user_id}")
         
         response = table.query(
             IndexName='RecordTypeIndex',
@@ -581,7 +588,7 @@ def get_oldest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         if not response['Items']:
-            print(f"[BodyMeasurementLambda] No measurements found for user: {user_id}")
+            logger.info(f"No measurements found for user: {user_id}")
             return {
                 "success": True,
                 "message": "測定記録が見つかりません",
@@ -598,7 +605,7 @@ def get_oldest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
             elif key.startswith('first_') and key.endswith('_record'):
                 result[key] = value
         
-        print(f"[BodyMeasurementLambda] Oldest measurements retrieved for user: {user_id}")
+        logger.info(f"Oldest measurements retrieved for user: {user_id}")
         return {
             "success": True,
             "message": "最古の測定値を取得しました",
@@ -607,10 +614,10 @@ def get_oldest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[BodyMeasurementLambda] DynamoDB error in get_oldest_measurements: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_oldest_measurements: {error_code} - {str(e)}")
         raise
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error in get_oldest_measurements: {str(e)}")
+        logger.error(f"Error in get_oldest_measurements: {str(e)}")
         raise
 
 
@@ -635,7 +642,7 @@ def get_measurement_history(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not start_date or not end_date:
             raise ValueError("start_date と end_date は必須です")
         
-        print(f"[BodyMeasurementLambda] Getting measurement history for user: {user_id} from {start_date} to {end_date}")
+        logger.debug(f"Getting measurement history for user: {user_id} from {start_date} to {end_date}")
         
         # 日付範囲でのクエリ
         response = table.query(
@@ -669,7 +676,7 @@ def get_measurement_history(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     clean_measurement['measurement_id'] = value.replace('MEASUREMENT#', '')
             result.append(clean_measurement)
         
-        print(f"[BodyMeasurementLambda] Retrieved {len(result)} measurements for user: {user_id}")
+        logger.info(f"Retrieved {len(result)} measurements for user: {user_id}")
         return {
             "success": True,
             "message": f"{len(result)}件の測定記録を取得しました",
@@ -683,10 +690,10 @@ def get_measurement_history(parameters: Dict[str, Any]) -> Dict[str, Any]:
         
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[BodyMeasurementLambda] DynamoDB error in get_measurement_history: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_measurement_history: {error_code} - {str(e)}")
         raise
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error in get_measurement_history: {str(e)}")
+        logger.error(f"Error in get_measurement_history: {str(e)}")
         raise
 
 
@@ -709,7 +716,7 @@ def update_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not measurement_id:
             raise ValueError("measurement_id is required")
         
-        print(f"[BodyMeasurementLambda] Updating measurement {measurement_id} for user: {user_id}")
+        logger.debug(f"Updating measurement {measurement_id} for user: {user_id}")
         
         # 更新する測定値を抽出
         update_data = {}
@@ -755,12 +762,12 @@ def update_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # DynamoDBに保存
         table.put_item(Item=updated_record)
         
-        print(f"[BodyMeasurementLambda] Updated measurement record: {measurement_id}")
+        logger.debug(f"Updated measurement record: {measurement_id}")
         
         # Latest レコードの再計算（更新されたレコードが最新の場合）
         recalculate_latest_record_after_update(user_id, measurement_id, update_data)
         
-        print(f"[BodyMeasurementLambda] Measurement updated successfully for user: {user_id}")
+        logger.info(f"Measurement updated successfully for user: {user_id}")
         return {
             "success": True,
             "message": "測定記録が正常に更新されました",
@@ -769,14 +776,14 @@ def update_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         }
         
     except ValueError as e:
-        print(f"[BodyMeasurementLambda] Validation error in update_body_measurement: {str(e)}")
+        logger.warning(f"Validation error in update_body_measurement: {str(e)}")
         raise
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[BodyMeasurementLambda] DynamoDB error in update_body_measurement: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in update_body_measurement: {error_code} - {str(e)}")
         raise
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Unexpected error in update_body_measurement: {str(e)}")
+        logger.error(f"Unexpected error in update_body_measurement: {str(e)}")
         raise
 
 
@@ -799,7 +806,7 @@ def delete_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         if not measurement_id:
             raise ValueError("measurement_id is required")
         
-        print(f"[BodyMeasurementLambda] Deleting measurement {measurement_id} for user: {user_id}")
+        logger.debug(f"Deleting measurement {measurement_id} for user: {user_id}")
         
         # 削除対象レコードの存在確認と取得
         response = table.get_item(
@@ -826,13 +833,13 @@ def delete_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
         
-        print(f"[BodyMeasurementLambda] Deleted measurement record: {measurement_id}")
+        logger.debug(f"Deleted measurement record: {measurement_id}")
         
         # Latest/Oldest レコードの再計算
         recalculate_latest_record_after_deletion(user_id, measurement_id)
         recalculate_oldest_record_after_deletion(user_id, measurement_id)
         
-        print(f"[BodyMeasurementLambda] Measurement deleted successfully for user: {user_id}")
+        logger.info(f"Measurement deleted successfully for user: {user_id}")
         return {
             "success": True,
             "message": "測定記録が正常に削除されました",
@@ -840,14 +847,14 @@ def delete_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         }
         
     except ValueError as e:
-        print(f"[BodyMeasurementLambda] Validation error in delete_body_measurement: {str(e)}")
+        logger.warning(f"Validation error in delete_body_measurement: {str(e)}")
         raise
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        print(f"[BodyMeasurementLambda] DynamoDB error in delete_body_measurement: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in delete_body_measurement: {error_code} - {str(e)}")
         raise
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Unexpected error in delete_body_measurement: {str(e)}")
+        logger.error(f"Unexpected error in delete_body_measurement: {str(e)}")
         raise
 
 
@@ -905,10 +912,10 @@ def recalculate_latest_record_after_update(user_id: str, updated_measurement_id:
             }
             table.put_item(Item=latest_record)
             
-            print(f"[BodyMeasurementLambda] Recalculated latest record after update for user: {user_id}")
+            logger.debug(f"Recalculated latest record after update for user: {user_id}")
         
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error recalculating latest record after update: {str(e)}")
+        logger.warning(f"Error recalculating latest record after update: {str(e)}")
 
 
 def recalculate_latest_record_after_deletion(user_id: str, deleted_measurement_id: str) -> None:
@@ -935,7 +942,7 @@ def recalculate_latest_record_after_deletion(user_id: str, deleted_measurement_i
                     'SK': 'MEASUREMENT#latest'
                 }
             )
-            print(f"[BodyMeasurementLambda] Deleted latest record (no measurements left) for user: {user_id}")
+            logger.debug(f"Deleted latest record (no measurements left) for user: {user_id}")
             return
         
         # 各測定タイプの最新値を再計算
@@ -965,10 +972,10 @@ def recalculate_latest_record_after_deletion(user_id: str, deleted_measurement_i
             }
             table.put_item(Item=latest_record)
             
-            print(f"[BodyMeasurementLambda] Recalculated latest record after deletion for user: {user_id}")
+            logger.debug(f"Recalculated latest record after deletion for user: {user_id}")
         
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error recalculating latest record after deletion: {str(e)}")
+        logger.warning(f"Error recalculating latest record after deletion: {str(e)}")
 
 
 def recalculate_oldest_record_after_deletion(user_id: str, deleted_measurement_id: str) -> None:
@@ -995,7 +1002,7 @@ def recalculate_oldest_record_after_deletion(user_id: str, deleted_measurement_i
                     'SK': 'MEASUREMENT#oldest'
                 }
             )
-            print(f"[BodyMeasurementLambda] Deleted oldest record (no measurements left) for user: {user_id}")
+            logger.debug(f"Deleted oldest record (no measurements left) for user: {user_id}")
             return
         
         # 各測定タイプの最古値を再計算
@@ -1025,7 +1032,7 @@ def recalculate_oldest_record_after_deletion(user_id: str, deleted_measurement_i
             }
             table.put_item(Item=oldest_record)
             
-            print(f"[BodyMeasurementLambda] Recalculated oldest record after deletion for user: {user_id}")
+            logger.debug(f"Recalculated oldest record after deletion for user: {user_id}")
         
     except Exception as e:
-        print(f"[BodyMeasurementLambda] Error recalculating oldest record after deletion: {str(e)}")
+        logger.warning(f"Error recalculating oldest record after deletion: {str(e)}")

@@ -296,6 +296,8 @@ class HealthmateHealthManagerStack(Stack):
             memory_size=256,
             environment={
                 "USERS_TABLE_NAME": self.users_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
             },
             log_group=user_log_group,  # ロググループを明示的に指定
         )
@@ -324,6 +326,8 @@ class HealthmateHealthManagerStack(Stack):
             memory_size=256,
             environment={
                 "GOALS_TABLE_NAME": self.goals_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
             },
             log_group=health_goal_log_group,  # ロググループを明示的に指定
         )
@@ -352,6 +356,8 @@ class HealthmateHealthManagerStack(Stack):
             memory_size=256,
             environment={
                 "POLICIES_TABLE_NAME": self.policies_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
             },
             log_group=health_policy_log_group,  # ロググループを明示的に指定
         )
@@ -380,6 +386,8 @@ class HealthmateHealthManagerStack(Stack):
             memory_size=256,
             environment={
                 "ACTIVITIES_TABLE_NAME": self.activities_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
             },
             log_group=activity_log_group,  # ロググループを明示的に指定
         )
@@ -435,6 +443,8 @@ class HealthmateHealthManagerStack(Stack):
             memory_size=256,
             environment={
                 "BODY_MEASUREMENTS_TABLE_NAME": self.body_measurements_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
             },
             log_group=body_measurement_log_group,  # ロググループを明示的に指定
         )
