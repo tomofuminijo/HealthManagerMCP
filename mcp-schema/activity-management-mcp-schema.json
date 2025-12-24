@@ -29,7 +29,7 @@
               },
               "activityType": {
                 "type": "string",
-                "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|weight|bodyFat|mood|medication|bowelMovement|urination|symptoms|other）"
+                "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|mood|medication|bowelMovement|urination|symptoms|other）"
               },
               "description": {
                 "type": "string",
@@ -40,7 +40,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "活動の詳細項目"
+                "description": "活動の具体的な内容リスト。食事の場合は食べた物と量（例：[\"おにぎり2個\", \"唐揚げ4個\", \"味噌汁1杯\"]）、運動の場合は運動内容と回数・時間（例：[\"腕立て伏せ20回\", \"ランニング30分\"]）など、具体的な詳細を記録するために利用してください。細かく登録しようとしすぎるとユーザが嫌になってしまうので、ユーザの申告した内容レベルを尊重してください。"
               }
             },
             "required": ["time", "activityType", "description"]
@@ -70,7 +70,7 @@
         },
         "activityType": {
           "type": "string",
-          "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|weight|bodyFat|mood|medication|bowelMovement|urination|symptoms|other）"
+          "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|mood|medication|bowelMovement|urination|symptoms|other）"
         },
         "description": {
           "type": "string",
@@ -81,7 +81,7 @@
           "items": {
             "type": "string"
           },
-          "description": "活動の詳細項目"
+          "description": "活動の具体的な内容リスト。食事の場合は食べた物と量（例：[\"おにぎり2個\", \"唐揚げ4個\", \"味噌汁1杯\"]）、運動の場合は運動内容と回数・時間（例：[\"腕立て伏せ20回\", \"ランニング30分\"]）など、具体的な詳細を記録するために利用してください。細かく登録しようとしすぎるとユーザが嫌になってしまうので、ユーザの申告した内容レベルを尊重してください。"
         }
       },
       "required": ["userId", "activityId"]
@@ -117,7 +117,7 @@
               },
               "activityType": {
                 "type": "string",
-                "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|weight|bodyFat|mood|medication|bowelMovement|urination|symptoms|other）"
+                "description": "活動タイプ（wakeUp|sleep|exercise|meal|snack|mood|medication|bowelMovement|urination|symptoms|other）"
               },
               "description": {
                 "type": "string",
@@ -128,7 +128,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "活動の詳細項目"
+                "description": "活動の具体的な内容リスト。食事の場合は食べた物と量（例：[\"おにぎり2個\", \"唐揚げ4個\", \"味噌汁1杯\"]）、運動の場合は運動内容と回数・時間（例：[\"腕立て伏せ20回\", \"ランニング30分\"]）など、具体的な詳細を記録するために利用してください。細かく登録しようとしすぎるとユーザが嫌になってしまうので、ユーザの申告した内容レベルを尊重してください。"
               }
             },
             "required": ["time", "activityType", "description"]

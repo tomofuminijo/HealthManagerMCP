@@ -44,8 +44,6 @@ ActivityType = Literal[
     "exercise",      # 運動
     "meal",          # 食事
     "snack",         # 間食
-    "weight",        # 体重測定
-    "bodyFat",       # 体脂肪率測定
     "mood",          # 気分記録
     "medication",    # 服薬
     "bowelMovement", # 排便
