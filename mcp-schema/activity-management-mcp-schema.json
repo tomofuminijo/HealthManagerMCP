@@ -52,7 +52,7 @@
   },
   {
     "name": "UpdateActivity",
-    "description": "指定した日の特定の時刻の活動だけを部分的に更新する。他の時刻の活動は変更されない。例：「8時の朝食を8時30分に変更」「12時の昼食の内容を修正」など、1つの活動のみを修正する場合に使用。",
+    "description": "指定したactivityIdの活動を部分的に更新する。例：「朝食の時刻を8時30分に変更」「昼食の内容を修正」など、1つの活動のみを修正する場合に使用。",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -60,13 +60,13 @@
           "type": "string",
           "description": "ユーザーID"
         },
-        "date": {
+        "activityId": {
           "type": "string",
-          "description": "日付（YYYY-MM-DD）"
+          "description": "更新対象の活動ID"
         },
         "time": {
           "type": "string",
-          "description": "更新対象の時刻（HH:MM）"
+          "description": "時刻（HH:MM）"
         },
         "activityType": {
           "type": "string",
@@ -84,7 +84,7 @@
           "description": "活動の詳細項目"
         }
       },
-      "required": ["userId", "date", "time"]
+      "required": ["userId", "activityId"]
     }
   },
   {
@@ -140,7 +140,7 @@
   },
   {
     "name": "DeleteActivity",
-    "description": "指定した日の特定の時刻の活動を削除する。他の時刻の活動は保持される。例：「8時の朝食を削除」「12時の記録を消して」など。",
+    "description": "指定したactivityIdの活動を削除する。例：「朝食を削除」「この記録を消して」など。",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -148,16 +148,12 @@
           "type": "string",
           "description": "ユーザーID"
         },
-        "date": {
+        "activityId": {
           "type": "string",
-          "description": "日付（YYYY-MM-DD）"
-        },
-        "time": {
-          "type": "string",
-          "description": "時刻（HH:MM）"
+          "description": "削除対象の活動ID"
         }
       },
-      "required": ["userId", "date", "time"]
+      "required": ["userId", "activityId"]
     }
   },
   {
