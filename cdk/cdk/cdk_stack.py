@@ -18,6 +18,9 @@ import json
 # AgentCore パッケージをインポート（正式版）
 from aws_cdk import aws_bedrockagentcore as bedrockagentcore
 
+# 環境設定モジュールをインポート
+from .environment import EnvironmentManager, ConfigurationProvider, LogController
+
 
 class HealthmateHealthManagerStack(Stack):
     """
@@ -35,6 +38,15 @@ class HealthmateHealthManagerStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # 環境設定の初期化
+        self.config_provider = ConfigurationProvider("healthmate-healthmanager")
+        self.current_environment = EnvironmentManager.get_environment()
+        
+        # ログ設定の初期化
+        self.log_controller = LogController("healthmate-healthmanager")
+        logger = self.log_controller.get_logger(__name__)
+        logger.info(f"Initializing HealthManager stack for environment: {self.current_environment}")
+
         # ========================================
         # DynamoDBテーブル
         # ========================================
@@ -43,7 +55,7 @@ class HealthmateHealthManagerStack(Stack):
         self.users_table = dynamodb.Table(
             self,
             "UsersTable",
-            table_name="healthmate-users",
+            table_name=f"healthmate-users{self.config_provider.get_environment_suffix()}",
             partition_key=dynamodb.Attribute(
                 name="userId", type=dynamodb.AttributeType.STRING
             ),
@@ -58,7 +70,7 @@ class HealthmateHealthManagerStack(Stack):
         self.goals_table = dynamodb.Table(
             self,
             "GoalsTable",
-            table_name="healthmate-goals",
+            table_name=f"healthmate-goals{self.config_provider.get_environment_suffix()}",
             partition_key=dynamodb.Attribute(
                 name="userId", type=dynamodb.AttributeType.STRING
             ),
@@ -94,7 +106,7 @@ class HealthmateHealthManagerStack(Stack):
         self.policies_table = dynamodb.Table(
             self,
             "PoliciesTable",
-            table_name="healthmate-policies",
+            table_name=f"healthmate-policies{self.config_provider.get_environment_suffix()}",
             partition_key=dynamodb.Attribute(
                 name="userId", type=dynamodb.AttributeType.STRING
             ),
@@ -130,7 +142,7 @@ class HealthmateHealthManagerStack(Stack):
         self.activities_table = dynamodb.Table(
             self,
             "ActivitiesTable",
-            table_name="healthmate-activities",
+            table_name=f"healthmate-activities{self.config_provider.get_environment_suffix()}",
             partition_key=dynamodb.Attribute(
                 name="userId", type=dynamodb.AttributeType.STRING
             ),
@@ -161,7 +173,7 @@ class HealthmateHealthManagerStack(Stack):
         self.gateway_user_pool = cognito.UserPool(
             self,
             "HealthManagerM2MUserPool",
-            user_pool_name="HealthManagerM2MUserPool",
+            user_pool_name=f"HealthManagerM2MUserPool{self.config_provider.get_environment_suffix()}",
             # M2M認証設定
             sign_in_aliases=cognito.SignInAliases(username=True),
             # セルフサインアップを無効化（M2M認証のため）
@@ -184,7 +196,7 @@ class HealthmateHealthManagerStack(Stack):
         self.gateway_user_pool_domain = self.gateway_user_pool.add_domain(
             "HealthManagerM2MUserPoolDomain",
             cognito_domain=cognito.CognitoDomainOptions(
-                domain_prefix="healthmanager-m2m-auth"
+                domain_prefix=f"healthmanager-m2m-auth{self.config_provider.get_environment_suffix()}",
             )
         )
 
@@ -246,7 +258,7 @@ class HealthmateHealthManagerStack(Stack):
             self,
             "HealthManagerWorkloadIdentity",
             # Workload Identity名（エージェントコードで指定する名称）
-            name="healthmanager-agentcore-identity"
+            name=f"healthmanager-agentcore-identity{self.config_provider.get_environment_suffix()}"
         )
 
         # 注意: OAuth2 Credential Providerは、AgentCore Identity APIを使用して
@@ -267,7 +279,7 @@ class HealthmateHealthManagerStack(Stack):
         user_log_group = logs.LogGroup(
             self,
             "UserLambdaLogGroup",
-            log_group_name="/aws/lambda/healthmanagermcp-user",
+            log_group_name=f"/aws/lambda/healthmanagermcp-user{self.config_provider.get_environment_suffix()}",
             retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
             removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
         )
@@ -276,7 +288,7 @@ class HealthmateHealthManagerStack(Stack):
         self.user_lambda = lambda_.Function(
             self,
             "UserLambda",
-            function_name="healthmanagermcp-user",
+            function_name=f"healthmanagermcp-user{self.config_provider.get_environment_suffix()}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="user.handler.lambda_handler",
             code=lambda_.Code.from_asset(lambda_code_path),
@@ -295,7 +307,7 @@ class HealthmateHealthManagerStack(Stack):
         health_goal_log_group = logs.LogGroup(
             self,
             "HealthGoalLambdaLogGroup",
-            log_group_name="/aws/lambda/healthmanagermcp-health-goal",
+            log_group_name=f"/aws/lambda/healthmanagermcp-health-goal{self.config_provider.get_environment_suffix()}",
             retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
             removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
         )
@@ -304,7 +316,7 @@ class HealthmateHealthManagerStack(Stack):
         self.health_goal_lambda = lambda_.Function(
             self,
             "HealthGoalLambda",
-            function_name="healthmanagermcp-health-goal",
+            function_name=f"healthmanagermcp-health-goal{self.config_provider.get_environment_suffix()}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="health_goal.handler.lambda_handler",
             code=lambda_.Code.from_asset(lambda_code_path),
@@ -323,7 +335,7 @@ class HealthmateHealthManagerStack(Stack):
         health_policy_log_group = logs.LogGroup(
             self,
             "HealthPolicyLambdaLogGroup",
-            log_group_name="/aws/lambda/healthmanagermcp-health-policy",
+            log_group_name=f"/aws/lambda/healthmanagermcp-health-policy{self.config_provider.get_environment_suffix()}",
             retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
             removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
         )
@@ -332,7 +344,7 @@ class HealthmateHealthManagerStack(Stack):
         self.health_policy_lambda = lambda_.Function(
             self,
             "HealthPolicyLambda",
-            function_name="healthmanagermcp-health-policy",
+            function_name=f"healthmanagermcp-health-policy{self.config_provider.get_environment_suffix()}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="health_policy.handler.lambda_handler",
             code=lambda_.Code.from_asset(lambda_code_path),
@@ -351,7 +363,7 @@ class HealthmateHealthManagerStack(Stack):
         activity_log_group = logs.LogGroup(
             self,
             "ActivityLambdaLogGroup",
-            log_group_name="/aws/lambda/healthmanagermcp-activity",
+            log_group_name=f"/aws/lambda/healthmanagermcp-activity{self.config_provider.get_environment_suffix()}",
             retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
             removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
         )
@@ -360,7 +372,7 @@ class HealthmateHealthManagerStack(Stack):
         self.activity_lambda = lambda_.Function(
             self,
             "ActivityLambda",
-            function_name="healthmanagermcp-activity",
+            function_name=f"healthmanagermcp-activity{self.config_provider.get_environment_suffix()}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="activity.handler.lambda_handler",
             code=lambda_.Code.from_asset(lambda_code_path),
@@ -379,7 +391,7 @@ class HealthmateHealthManagerStack(Stack):
         self.body_measurements_table = dynamodb.Table(
             self,
             "BodyMeasurementsTable",
-            table_name="healthmate-body-measurements",
+            table_name=f"healthmate-body-measurements{self.config_provider.get_environment_suffix()}",
             partition_key=dynamodb.Attribute(
                 name="PK", type=dynamodb.AttributeType.STRING
             ),
@@ -406,7 +418,7 @@ class HealthmateHealthManagerStack(Stack):
         body_measurement_log_group = logs.LogGroup(
             self,
             "BodyMeasurementLambdaLogGroup",
-            log_group_name="/aws/lambda/healthmanagermcp-body-measurement",
+            log_group_name=f"/aws/lambda/healthmanagermcp-body-measurement{self.config_provider.get_environment_suffix()}",
             retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
             removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
         )
@@ -415,7 +427,7 @@ class HealthmateHealthManagerStack(Stack):
         self.body_measurement_lambda = lambda_.Function(
             self,
             "BodyMeasurementLambda",
-            function_name="healthmanagermcp-body-measurement",
+            function_name=f"healthmanagermcp-body-measurement{self.config_provider.get_environment_suffix()}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="body_measurement.handler.lambda_handler",
             code=lambda_.Code.from_asset(lambda_code_path),
@@ -447,7 +459,7 @@ class HealthmateHealthManagerStack(Stack):
                         "aws:SourceAccount": self.account
                     },
                     "ArnLike": {
-                        "aws:SourceArn": f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/healthmate-gateway-*"
+                        "aws:SourceArn": f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/healthmate-gateway{self.config_provider.get_environment_suffix()}-*"
                     }
                 }
             ),
@@ -475,7 +487,7 @@ class HealthmateHealthManagerStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["bedrock-agentcore:GetGateway"],
                 resources=[
-                    f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/healthmate-gateway-*"
+                    f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/healthmate-gateway{self.config_provider.get_environment_suffix()}-*"
                 ],
             )
         )
@@ -487,7 +499,7 @@ class HealthmateHealthManagerStack(Stack):
         self.agentcore_gateway = bedrockagentcore.CfnGateway(
             self,
             "AgentCoreGateway",
-            name="healthmate-gateway",
+            name=f"healthmate-gateway{self.config_provider.get_environment_suffix()}",
             description="HealthManagerMCP Gateway for Healthmate ecosystem integration",
             protocol_type="MCP",
             role_arn=gateway_role.role_arn,
@@ -691,7 +703,7 @@ class HealthmateHealthManagerStack(Stack):
             "UserPoolId",
             value=self.gateway_user_pool.user_pool_id,
             description="M2M Cognito User Pool ID",
-            export_name="Healthmate-HealthManager-UserPoolId"
+            export_name=f"Healthmate-HealthManager-UserPoolId{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -699,7 +711,7 @@ class HealthmateHealthManagerStack(Stack):
             "UserPoolClientId", 
             value=self.gateway_app_client.user_pool_client_id,
             description="M2M Cognito User Pool Client ID",
-            export_name="Healthmate-HealthManager-UserPoolClientId"
+            export_name=f"Healthmate-HealthManager-UserPoolClientId{self.config_provider.get_environment_suffix()}"
         )
 
         # AgentCore Identity名（Runtime環境変数用）
@@ -708,7 +720,7 @@ class HealthmateHealthManagerStack(Stack):
             "WorkloadIdentityName",
             value=self.workload_identity.name,
             description="AgentCore Workload Identity name for Runtime agent authentication",
-            export_name="Healthmate-HealthManager-WorkloadIdentityName"
+            export_name=f"Healthmate-HealthManager-WorkloadIdentityName{self.config_provider.get_environment_suffix()}"
         )
 
         # Workload Identity ARN（参照用）
@@ -717,7 +729,7 @@ class HealthmateHealthManagerStack(Stack):
             "WorkloadIdentityArn",
             value=self.workload_identity.attr_workload_identity_arn,
             description="AgentCore Workload Identity ARN",
-            export_name="Healthmate-HealthManager-WorkloadIdentityArn"
+            export_name=f"Healthmate-HealthManager-WorkloadIdentityArn{self.config_provider.get_environment_suffix()}"
         )
 
         # Cognito Domain（Token URL用）
@@ -726,7 +738,7 @@ class HealthmateHealthManagerStack(Stack):
             "CognitoDomain",
             value=self.gateway_user_pool_domain.domain_name,
             description="Cognito User Pool Domain for OAuth2 token endpoint",
-            export_name="Healthmate-HealthManager-CognitoDomain"
+            export_name=f"Healthmate-HealthManager-CognitoDomain{self.config_provider.get_environment_suffix()}"
         )
 
         # OAuth2 Token URL（Credential Provider作成用）
@@ -735,7 +747,7 @@ class HealthmateHealthManagerStack(Stack):
             "OAuth2TokenUrl",
             value=f"https://{self.gateway_user_pool_domain.domain_name}.auth.{self.region}.amazoncognito.com/oauth2/token",
             description="OAuth2 Token URL for Credential Provider configuration",
-            export_name="Healthmate-HealthManager-OAuth2TokenUrl"
+            export_name=f"Healthmate-HealthManager-OAuth2TokenUrl{self.config_provider.get_environment_suffix()}"
         )
 
         # M2M認証では直接トークンエンドポイントを使用
@@ -744,7 +756,7 @@ class HealthmateHealthManagerStack(Stack):
             "TokenUrl",
             value=f"https://cognito-idp.{self.region}.amazonaws.com/",
             description="Cognito Identity Provider Base URL for M2M Token Exchange",
-            export_name="Healthmate-HealthManager-TokenUrl"
+            export_name=f"Healthmate-HealthManager-TokenUrl{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -752,7 +764,7 @@ class HealthmateHealthManagerStack(Stack):
             "GatewayEndpoint",
             value=f"https://{self.agentcore_gateway.ref}.gateway.bedrock-agentcore.{self.region}.amazonaws.com/mcp",
             description="AgentCore Gateway MCP Endpoint",
-            export_name="Healthmate-HealthManager-GatewayEndpoint"
+            export_name=f"Healthmate-HealthManager-GatewayEndpoint{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -760,7 +772,7 @@ class HealthmateHealthManagerStack(Stack):
             "GatewayId",
             value=self.agentcore_gateway.ref,
             description="AgentCore Gateway ID",
-            export_name="Healthmate-HealthManager-GatewayId"
+            export_name=f"Healthmate-HealthManager-GatewayId{self.config_provider.get_environment_suffix()}"
         )
 
         # Lambda関数ARN
@@ -769,7 +781,7 @@ class HealthmateHealthManagerStack(Stack):
             "UserLambdaArn",
             value=self.user_lambda.function_arn,
             description="User Lambda Function ARN",
-            export_name="Healthmate-HealthManager-UserLambdaArn"
+            export_name=f"Healthmate-HealthManager-UserLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -777,7 +789,7 @@ class HealthmateHealthManagerStack(Stack):
             "HealthGoalLambdaArn",
             value=self.health_goal_lambda.function_arn,
             description="Health Goal Lambda Function ARN",
-            export_name="Healthmate-HealthManager-HealthGoalLambdaArn"
+            export_name=f"Healthmate-HealthManager-HealthGoalLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -785,7 +797,7 @@ class HealthmateHealthManagerStack(Stack):
             "HealthPolicyLambdaArn",
             value=self.health_policy_lambda.function_arn,
             description="Health Policy Lambda Function ARN",
-            export_name="Healthmate-HealthManager-HealthPolicyLambdaArn"
+            export_name=f"Healthmate-HealthManager-HealthPolicyLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -793,7 +805,7 @@ class HealthmateHealthManagerStack(Stack):
             "ActivityLambdaArn",
             value=self.activity_lambda.function_arn,
             description="Activity Lambda Function ARN",
-            export_name="Healthmate-HealthManager-ActivityLambdaArn"
+            export_name=f"Healthmate-HealthManager-ActivityLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -801,7 +813,7 @@ class HealthmateHealthManagerStack(Stack):
             "BodyMeasurementLambdaArn",
             value=self.body_measurement_lambda.function_arn,
             description="Body Measurement Lambda Function ARN",
-            export_name="Healthmate-HealthManager-BodyMeasurementLambdaArn"
+            export_name=f"Healthmate-HealthManager-BodyMeasurementLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
         # DynamoDBテーブル名
@@ -810,7 +822,7 @@ class HealthmateHealthManagerStack(Stack):
             "UsersTableName",
             value=self.users_table.table_name,
             description="Users DynamoDB Table Name",
-            export_name="Healthmate-HealthManager-UsersTableName"
+            export_name=f"Healthmate-HealthManager-UsersTableName{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -818,7 +830,7 @@ class HealthmateHealthManagerStack(Stack):
             "GoalsTableName",
             value=self.goals_table.table_name,
             description="Goals DynamoDB Table Name",
-            export_name="Healthmate-HealthManager-GoalsTableName"
+            export_name=f"Healthmate-HealthManager-GoalsTableName{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -826,7 +838,7 @@ class HealthmateHealthManagerStack(Stack):
             "PoliciesTableName",
             value=self.policies_table.table_name,
             description="Policies DynamoDB Table Name",
-            export_name="Healthmate-HealthManager-PoliciesTableName"
+            export_name=f"Healthmate-HealthManager-PoliciesTableName{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -834,7 +846,7 @@ class HealthmateHealthManagerStack(Stack):
             "ActivitiesTableName",
             value=self.activities_table.table_name,
             description="Activities DynamoDB Table Name",
-            export_name="Healthmate-HealthManager-ActivitiesTableName"
+            export_name=f"Healthmate-HealthManager-ActivitiesTableName{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -842,7 +854,7 @@ class HealthmateHealthManagerStack(Stack):
             "BodyMeasurementsTableName",
             value=self.body_measurements_table.table_name,
             description="Body Measurements DynamoDB Table Name",
-            export_name="Healthmate-HealthManager-BodyMeasurementsTableName"
+            export_name=f"Healthmate-HealthManager-BodyMeasurementsTableName{self.config_provider.get_environment_suffix()}"
         )
 
         # M2M認証用のJWKS URL
@@ -851,7 +863,7 @@ class HealthmateHealthManagerStack(Stack):
             "JwksUrl",
             value=f"https://cognito-idp.{self.region}.amazonaws.com/{self.gateway_user_pool.user_pool_id}/.well-known/jwks.json",
             description="JWKS URL for M2M JWT token verification",
-            export_name="Healthmate-HealthManager-JwksUrl"
+            export_name=f"Healthmate-HealthManager-JwksUrl{self.config_provider.get_environment_suffix()}"
         )
 
         CfnOutput(
@@ -859,7 +871,7 @@ class HealthmateHealthManagerStack(Stack):
             "DiscoveryUrl",
             value=discovery_url,
             description="OIDC Discovery URL",
-            export_name="Healthmate-HealthManager-DiscoveryUrl"
+            export_name=f"Healthmate-HealthManager-DiscoveryUrl{self.config_provider.get_environment_suffix()}"
         )
 
         # カスタムOAuthスコープ
@@ -868,5 +880,5 @@ class HealthmateHealthManagerStack(Stack):
             "CustomScope",
             value="HealthManager/HealthTarget:invoke",
             description="Custom OAuth scope for AgentCore Gateway M2M authentication",
-            export_name="Healthmate-HealthManager-CustomScope"
+            export_name=f"Healthmate-HealthManager-CustomScope{self.config_provider.get_environment_suffix()}"
         )

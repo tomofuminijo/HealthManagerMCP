@@ -2,11 +2,24 @@
 
 # AgentCore Identity OAuth2 Credential Provider削除スクリプト
 
-STACK_NAME="Healthmate-HealthManagerStack"
+# 環境設定
+HEALTHMATE_ENV=${HEALTHMATE_ENV:-dev}
 REGION="us-west-2"
-CREDENTIAL_PROVIDER_NAME="healthmanager-oauth2-provider"
+
+# 環境別リソース名の生成
+if [ "$HEALTHMATE_ENV" = "prod" ]; then
+    STACK_NAME="Healthmate-HealthManagerStack"
+    CREDENTIAL_PROVIDER_NAME="healthmanager-oauth2-provider"
+else
+    STACK_NAME="Healthmate-HealthManagerStack-${HEALTHMATE_ENV}"
+    CREDENTIAL_PROVIDER_NAME="healthmanager-oauth2-provider-${HEALTHMATE_ENV}"
+fi
 
 echo "=== AgentCore Identity OAuth2 Credential Provider 削除 ==="
+echo "Environment: $HEALTHMATE_ENV"
+echo "Stack Name: $STACK_NAME"
+echo "Credential Provider Name: $CREDENTIAL_PROVIDER_NAME"
+echo ""
 
 # 既存のCredential Providerの確認
 echo "既存のCredential Providerを確認中..."
@@ -34,4 +47,4 @@ echo "=== 削除完了 ==="
 echo "OAuth2 Credential Providerの削除が完了しました！"
 echo ""
 echo "次のステップ: CDKスタックを削除する場合は以下を実行してください"
-echo "cd cdk && cdk destroy"
+echo "cd cdk && HEALTHMATE_ENV=$HEALTHMATE_ENV cdk destroy"
