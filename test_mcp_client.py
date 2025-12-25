@@ -15,6 +15,7 @@ HealthManagerMCP テスト用MCPクライアント（M2M認証版）
 - HealthPolicyManagement (4ツール): AddPolicy, UpdatePolicy, DeletePolicy, GetPolicies
 - ActivityManagement (6ツール): AddActivities, UpdateActivity, UpdateActivities, DeleteActivity, GetActivities, GetActivitiesInRange
 - BodyMeasurementManagement (6ツール): AddBodyMeasurement, UpdateBodyMeasurement, DeleteBodyMeasurement, GetLatestMeasurements, GetOldestMeasurements, GetMeasurementHistory
+- HealthConcernManagement (4ツール): AddConcern, UpdateConcern, DeleteConcern, GetConcerns
 
 環境設定:
     HEALTHMATE_ENV環境変数で環境を指定（dev/stage/prod、デフォルト: dev）
@@ -274,8 +275,8 @@ class HealthManagerMCPTestClient:
             return False
     
     def test_mcp_tools(self) -> bool:
-        """実際のMCPツールを呼び出してテスト（全23ツール）"""
-        print("🧪 MCP ツール呼び出しテスト中（全23ツール）...")
+        """実際のMCPツールを呼び出してテスト（全27ツール）"""
+        print("🧪 MCP ツール呼び出しテスト中（全27ツール）...")
         
         if not self.gateway_endpoint or not self.access_token:
             print("❌ Gateway EndpointまたはAccess Tokenが設定されていません")
@@ -1475,13 +1476,243 @@ class HealthManagerMCPTestClient:
             print(f"❌ DeleteBodyMeasurement例外: {str(e)}")
             success = False
         
-        print(f"\n🏁 全23ツールのテスト完了")
+        # === HealthConcernManagement ツール (4個) ===
+        
+        test_concern_id = None
+        
+        # テスト24: HealthConcernManagement.AddConcern
+        print("\n--- 24. HealthConcernManagement.AddConcern テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthConcernManagement___AddConcern",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "category": ["PHYSICAL", "MENTAL"],
+                        "description": "仕事のストレスで胃が痛く、眠りが浅い",
+                        "severity": 4,
+                        "triggers": "低気圧、寝不足、仕事の締切",
+                        "history": "薬は効かない。ストレッチが少し有効。"
+                    }
+                },
+                "id": 24
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ AddConcern失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddConcern成功")
+                    # concernIdを保存（後続のテストで使用）
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'concernId' in parsed_content:
+                                        test_concern_id = parsed_content['concernId']
+                                        print(f"   保存されたconcernId: {test_concern_id}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ AddConcern失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ AddConcern例外: {str(e)}")
+            success = False
+        
+        # テスト25: HealthConcernManagement.GetConcerns
+        print("\n--- 25. HealthConcernManagement.GetConcerns テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthConcernManagement___GetConcerns",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 25
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetConcerns失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetConcerns成功")
+                    # concernIdを取得（AddConcernで取得できなかった場合）
+                    if not test_concern_id and 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'concerns' in parsed_content and parsed_content['concerns']:
+                                        first_concern = parsed_content['concerns'][0]
+                                        if 'concernId' in first_concern:
+                                            test_concern_id = first_concern['concernId']
+                                            print(f"   取得されたconcernId: {test_concern_id}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetConcerns失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetConcerns例外: {str(e)}")
+            success = False
+        
+        # テスト26: HealthConcernManagement.UpdateConcern
+        print("\n--- 26. HealthConcernManagement.UpdateConcern テスト ---")
+        try:
+            if test_concern_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthConcernManagement___UpdateConcern",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "concernId": test_concern_id,
+                            "description": "更新された悩み：仕事のストレスで胃が痛く、眠りが浅い。最近は頭痛も。",
+                            "severity": 5,
+                            "status": "IMPROVED",
+                            "triggers": "低気圧、寝不足、仕事の締切、人間関係",
+                            "history": "薬は効かない。ストレッチが少し有効。瞑想を始めた。"
+                        }
+                    },
+                    "id": 26
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ UpdateConcern失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ UpdateConcern成功")
+                else:
+                    print(f"❌ UpdateConcern失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ UpdateConcern スキップ: concernIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ UpdateConcern例外: {str(e)}")
+            success = False
+        
+        # テスト27: HealthConcernManagement.GetConcerns (フィルタリングテスト)
+        print("\n--- 27. HealthConcernManagement.GetConcerns (フィルタリング) テスト ---")
+        try:
+            # ステータスフィルタリングテスト
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthConcernManagement___GetConcerns",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "status": "IMPROVED"
+                    }
+                },
+                "id": 27
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetConcerns(フィルタリング)失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetConcerns(フィルタリング)成功")
+                    # IMPROVEDステータスの悩みが取得できることを確認
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    concerns = parsed_content.get('concerns', [])
+                                    if concerns and len(concerns) > 0:
+                                        first_concern = concerns[0]
+                                        if first_concern.get('status') == 'IMPROVED':
+                                            print(f"   ✅ フィルタリング確認: ステータス={first_concern.get('status')}")
+                                        else:
+                                            print(f"   ⚠️ フィルタリングが正しく動作していません")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetConcerns(フィルタリング)失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetConcerns(フィルタリング)例外: {str(e)}")
+            success = False
+        
+        # テスト28: HealthConcernManagement.DeleteConcern
+        print("\n--- 28. HealthConcernManagement.DeleteConcern テスト ---")
+        try:
+            if test_concern_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthConcernManagement___DeleteConcern",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "concernId": test_concern_id
+                        }
+                    },
+                    "id": 28
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ DeleteConcern失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ DeleteConcern成功")
+                        print(f"   削除されたconcernId: {test_concern_id}")
+                else:
+                    print(f"❌ DeleteConcern失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ DeleteConcern スキップ: concernIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ DeleteConcern例外: {str(e)}")
+            success = False
+        
+        print(f"\n🏁 全27ツールのテスト完了（HealthConcernManagement 4ツール追加）")
         return success
     
 
     def run_tests(self) -> bool:
         """全テストを実行（M2M認証版）"""
-        print("🚀 HealthManagerMCP M2M認証テスト開始（全23ツール）")
+        print("🚀 HealthManagerMCP M2M認証テスト開始（全27ツール）")
         print(f"🌍 Environment: {ENVIRONMENT}")
         print(f"📦 Stack Name: {STACK_NAME}")
         print("=" * 60)
@@ -1496,13 +1727,13 @@ class HealthManagerMCPTestClient:
         if not self.test_mcp_connection():
             success = False
         
-        # 3. MCPツール呼び出しテスト（全23ツール）
+        # 3. MCPツール呼び出しテスト（全27ツール）
         if not self.test_mcp_tools():
             success = False
         
         print("=" * 60)
         if success:
-            print("✅ 全M2M認証テスト完了（23ツール全て成功）")
+            print("✅ 全M2M認証テスト完了（27ツール全て成功）")
         else:
             print("⚠️  一部テストで問題が発生しました")
         

@@ -1,0 +1,141 @@
+[
+  {
+    "name": "AddConcern",
+    "description": "新しい健康上の悩みを追加する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "category": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["PHYSICAL", "MENTAL"]
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "description": "悩みのカテゴリ（PHYSICAL、MENTAL、または両方）"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "悩みの詳細説明（例: 仕事のストレスで胃が痛く、眠りが浅い）"
+        },
+        "severity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "深刻度（1-5、デフォルト: 3）"
+        },
+        "triggers": {
+          "type": "string",
+          "description": "悩み事が発生するトリガー（例: 低気圧、寝不足）"
+        },
+        "history": {
+          "type": "string",
+          "description": "これまでの対処履歴（例: 薬は効かない。ストレッチが有効。）"
+        }
+      },
+      "required": ["userId", "category", "description"]
+    }
+  },
+  {
+    "name": "UpdateConcern",
+    "description": "既存の健康上の悩みを更新する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "concernId": {
+          "type": "string",
+          "description": "悩みID（UUID）"
+        },
+        "category": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["PHYSICAL", "MENTAL"]
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "description": "悩みのカテゴリ"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "悩みの詳細説明"
+        },
+        "severity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "深刻度（1-5）"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "IMPROVED", "RESOLVED"],
+          "description": "ステータス（ACTIVE: アクティブ、IMPROVED: 改善、RESOLVED: 解決）"
+        },
+        "triggers": {
+          "type": "string",
+          "description": "悩み事が発生するトリガー"
+        },
+        "history": {
+          "type": "string",
+          "description": "これまでの対処履歴"
+        }
+      },
+      "required": ["userId", "concernId"]
+    }
+  },
+  {
+    "name": "DeleteConcern",
+    "description": "指定した健康上の悩みを削除する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "concernId": {
+          "type": "string",
+          "description": "悩みID（UUID）"
+        }
+      },
+      "required": ["userId", "concernId"]
+    }
+  },
+  {
+    "name": "GetConcerns",
+    "description": "ユーザーのすべての健康上の悩みを取得する",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "IMPROVED", "RESOLVED"],
+          "description": "ステータスでフィルタリング（オプション）"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["PHYSICAL", "MENTAL"],
+          "description": "カテゴリでフィルタリング（オプション）"
+        }
+      },
+      "required": ["userId"]
+    }
+  }
+]
