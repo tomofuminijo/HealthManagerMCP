@@ -16,6 +16,33 @@
 - 🔧 **MCP準拠**: Model Context Protocolによる標準化されたAPI
 - 🏗️ **完全IaC**: CDKによる全リソースの一元管理（Gateway Targets含む）
 - ✅ **テスト完備**: 単体テスト + 統合テストによる品質保証
+- 🌍 **環境分離**: Dev/Stage/Prod環境の完全分離とログレベル制御
+
+## 🌍 環境設定
+
+### 対応環境
+
+Healthmate-HealthManager は以下の3つの環境をサポートします：
+
+- **dev**: 開発環境（デフォルト）- DEBUGログレベル
+- **stage**: ステージング環境 - INFOログレベル  
+- **prod**: 本番環境 - WARNINGログレベル
+
+### 環境変数
+
+| 変数名 | 説明 | デフォルト値 | 例 |
+|--------|------|-------------|-----|
+| `HEALTHMATE_ENV` | デプロイ環境 | `dev` | `dev`, `stage`, `prod` |
+| `AWS_REGION` | AWSリージョン | `us-west-2` | `us-west-2` |
+| `LOG_LEVEL` | ログレベル | 環境により自動設定 | `DEBUG`, `INFO`, `WARNING` |
+
+### 環境別リソース命名
+
+| 環境 | DynamoDBテーブル | Lambda関数 | Gateway名 |
+|------|-----------------|------------|-----------|
+| dev | `healthmate-users-dev` | `healthmate-UserLambda-dev` | `healthmate-gateway-dev` |
+| stage | `healthmate-users-stage` | `healthmate-UserLambda-stage` | `healthmate-gateway-stage` |
+| prod | `healthmate-users` | `healthmate-UserLambda` | `healthmate-gateway` |
 
 ## 🏗️ Healthmateエコシステム
 
@@ -141,18 +168,30 @@ pip install -r requirements.txt
 cd cdk && npm install && cd ..
 ```
 
-### デプロイ
+### 環境別デプロイ
 
 #### 方法1: 完全自動デプロイ（推奨）
 
 ```bash
-# CDK + AgentCore Identity の完全デプロイ
+# 開発環境（デフォルト）
+export HEALTHMATE_ENV=dev
+./scripts/deploy-full-stack.sh
+
+# ステージング環境
+export HEALTHMATE_ENV=stage
+./scripts/deploy-full-stack.sh
+
+# 本番環境
+export HEALTHMATE_ENV=prod
 ./scripts/deploy-full-stack.sh
 ```
 
 #### 方法2: 手動ステップ実行
 
 ```bash
+# 環境変数を設定（オプション）
+export HEALTHMATE_ENV=dev  # dev, stage, prod
+
 # Step 1: CDKスタックをデプロイ
 cd cdk
 cdk deploy --require-approval never
@@ -160,6 +199,17 @@ cdk deploy --require-approval never
 # Step 2: AgentCore Identity (OAuth2 Credential Provider) を作成
 cd ..
 ./scripts/create-credential-provider.sh
+```
+
+### 環境設定の確認
+
+```bash
+# 現在の環境設定を確認
+python test_environment_config.py
+
+# 環境別リソース確認
+aws dynamodb list-tables --query 'TableNames[?contains(@, `healthmate`)]'
+aws lambda list-functions --query 'Functions[?contains(FunctionName, `healthmate`)]'
 ```
 
 ### アンデプロイ
