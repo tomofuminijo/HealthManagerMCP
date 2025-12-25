@@ -4,7 +4,7 @@
 
 # 環境設定
 HEALTHMATE_ENV=${HEALTHMATE_ENV:-dev}
-REGION="us-west-2"
+REGION=${AWS_REGION:-"us-west-2"}
 
 # 環境別リソース名の生成
 if [ "$HEALTHMATE_ENV" = "prod" ]; then
