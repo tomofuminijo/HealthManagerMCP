@@ -5,7 +5,7 @@
 # 環境設定
 HEALTHMATE_ENV=${HEALTHMATE_ENV:-dev}
 REGION=${AWS_REGION:-"us-west-2"}
-
+ 
 # 環境別リソース名の生成
 if [ "$HEALTHMATE_ENV" = "prod" ]; then
     STACK_NAME="Healthmate-HealthManagerStack"
@@ -23,6 +23,7 @@ echo ""
 
 # CloudFormation出力の取得
 echo "CloudFormation出力を取得中..."
+echo "REGION: " $REGION
 USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
 CLIENT_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text)
 DISCOVERY_URL=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='DiscoveryUrl'].OutputValue" --output text)
@@ -42,7 +43,7 @@ echo "既存のCredential Providerを確認中..."
 if aws bedrock-agentcore-control get-oauth2-credential-provider --name "$CREDENTIAL_PROVIDER_NAME" --region "$REGION" >/dev/null 2>&1; then
     echo "既存のCredential Providerを削除中..."
     aws bedrock-agentcore-control delete-oauth2-credential-provider --name "$CREDENTIAL_PROVIDER_NAME" --region "$REGION"
-    sleep 5
+    sleep 10
 fi
 
 # 新しいCredential Providerの作成
