@@ -42,7 +42,7 @@ Healthmate-HealthManager は以下の3つの環境をサポートします：
 |------|-----------------|------------|-----------|
 | dev | `healthmate-users-dev` | `healthmate-UserLambda-dev` | `healthmate-gateway-dev` |
 | stage | `healthmate-users-stage` | `healthmate-UserLambda-stage` | `healthmate-gateway-stage` |
-| prod | `healthmate-users` | `healthmate-UserLambda` | `healthmate-gateway` |
+| prod | `healthmate-users-prod` | `healthmate-UserLambda-prod` | `healthmate-gateway-prod` |
 
 ## 🏗️ Healthmateエコシステム
 
