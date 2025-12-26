@@ -10,13 +10,8 @@ HEALTHMATE_ENV=${HEALTHMATE_ENV:-dev}
 REGION=${AWS_REGION:-"us-west-2"}
 
 # 環境別スタック名の生成
-if [ "$HEALTHMATE_ENV" = "prod" ]; then
-    STACK_NAME="Healthmate-HealthManagerStack"
-    ENV_SUFFIX=""
-else
-    STACK_NAME="Healthmate-HealthManagerStack-${HEALTHMATE_ENV}"
-    ENV_SUFFIX="-${HEALTHMATE_ENV}"
-fi
+STACK_NAME="Healthmate-HealthManagerStack-${HEALTHMATE_ENV}"
+ENV_SUFFIX="-${HEALTHMATE_ENV}"
 
 echo "=== Healthmate-HealthManager 完全削除開始 ==="
 echo "Environment: $HEALTHMATE_ENV"

@@ -7,13 +7,8 @@ HEALTHMATE_ENV=${HEALTHMATE_ENV:-dev}
 REGION=${AWS_REGION:-"us-west-2"}
  
 # 環境別リソース名の生成
-if [ "$HEALTHMATE_ENV" = "prod" ]; then
-    STACK_NAME="Healthmate-HealthManagerStack"
-    CREDENTIAL_PROVIDER_NAME="healthmanager-oauth2-provider"
-else
-    STACK_NAME="Healthmate-HealthManagerStack-${HEALTHMATE_ENV}"
-    CREDENTIAL_PROVIDER_NAME="healthmanager-oauth2-provider-${HEALTHMATE_ENV}"
-fi
+STACK_NAME="Healthmate-HealthManagerStack-${HEALTHMATE_ENV}"
+CREDENTIAL_PROVIDER_NAME="healthmanager-oauth2-provider-${HEALTHMATE_ENV}"
 
 echo "=== AgentCore Identity OAuth2 Credential Provider 作成 ==="
 echo "Environment: $HEALTHMATE_ENV"

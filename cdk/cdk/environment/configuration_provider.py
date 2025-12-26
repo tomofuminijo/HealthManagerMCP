@@ -23,10 +23,8 @@ class ConfigurationProvider:
             base_stack_name: ベースとなるStack名（例: "Healthmate-HealthManagerStack"）
             
         Returns:
-            環境別Stack名（例: "Healthmate-HealthManagerStack-dev"、prod環境では"Healthmate-HealthManagerStack"）
+            環境別Stack名（例: "Healthmate-HealthManagerStack-dev"、"Healthmate-HealthManagerStack-prod"）
         """
-        if self.environment == "prod":
-            return base_stack_name
         return f"{base_stack_name}-{self.environment}"
     
     def get_aws_region(self) -> str:
@@ -41,8 +39,6 @@ class ConfigurationProvider:
         """環境サフィックスの取得
         
         Returns:
-            環境サフィックス（prod環境では空文字、他環境では-{env}）
+            環境サフィックス（全環境で-{env}形式）
         """
-        if self.environment == "prod":
-            return ""
         return f"-{self.environment}"
