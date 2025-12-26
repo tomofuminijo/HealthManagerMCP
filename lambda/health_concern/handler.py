@@ -131,7 +131,7 @@ def add_concern(parameters: Dict[str, Any]) -> Dict[str, Any]:
     
     Args:
         parameters: userId, category, description, severity(optional), 
-                   triggers(optional), history(optional)
+                   status(optional), triggers(optional), history(optional)
 
     Returns:
         作成された健康悩み情報
@@ -144,6 +144,7 @@ def add_concern(parameters: Dict[str, Any]) -> Dict[str, Any]:
     category = parameters.get("category")
     description = parameters.get("description")
     severity = parameters.get("severity", 3)  # デフォルト深刻度: 3
+    status = parameters.get("status", "ACTIVE")  # デフォルトステータス: ACTIVE
     triggers = parameters.get("triggers", "")
     history = parameters.get("history", "")
 
@@ -171,6 +172,11 @@ def add_concern(parameters: Dict[str, Any]) -> Dict[str, Any]:
     # severityの検証
     if not isinstance(severity, int) or severity < 1 or severity > 5:
         raise ValueError("severity must be an integer between 1 and 5")
+    
+    # statusの検証
+    valid_statuses = ['ACTIVE', 'IMPROVED', 'RESOLVED']
+    if status not in valid_statuses:
+        raise ValueError(f"status must be one of: {', '.join(valid_statuses)}")
 
     # UUIDでconcernIdを生成
     concern_id = str(uuid.uuid4())
@@ -185,7 +191,7 @@ def add_concern(parameters: Dict[str, Any]) -> Dict[str, Any]:
         "category": category,
         "description": description,
         "severity": severity,
-        "status": "ACTIVE",  # デフォルトステータス
+        "status": status,  # パラメータから取得したステータス
         "triggers": triggers,
         "history": history,
         "createdAt": now,

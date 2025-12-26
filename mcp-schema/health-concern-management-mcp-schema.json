@@ -31,6 +31,11 @@
           "maximum": 5,
           "description": "深刻度（1-5、デフォルト: 3）"
         },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "IMPROVED", "RESOLVED"],
+          "description": "ステータス（ACTIVE: 継続中、IMPROVED: 改善中、RESOLVED: 解決）"
+        },
         "triggers": {
           "type": "string",
           "description": "悩み事が発生するトリガー（例: 低気圧、寝不足）"
@@ -82,7 +87,7 @@
         "status": {
           "type": "string",
           "enum": ["ACTIVE", "IMPROVED", "RESOLVED"],
-          "description": "ステータス（ACTIVE: アクティブ、IMPROVED: 改善、RESOLVED: 解決）"
+          "description": "ステータス（ACTIVE: 継続中、IMPROVED: 改善中、RESOLVED: 解決）"
         },
         "triggers": {
           "type": "string",
