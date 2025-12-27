@@ -12,44 +12,18 @@
 - 🔐 **セキュアな認証**: Cognito OAuth 2.0による堅牢な認証システム
 - 🚀 **サーバーレス**: AWS Lambda + DynamoDBによる高可用性・低コスト運用
 - 🤖 **AI連携**: ChatGPT、Claude、Gemini等の外部AIクライアントとの直接連携
-- 📊 **包括的な健康管理**: 目標設定から日々の活動記録まで一元管理
+- 📊 **包括的な健康管理**: 目標設定から日々の活動記録、日記管理まで一元管理
 - 🔧 **MCP準拠**: Model Context Protocolによる標準化されたAPI
-- 🏗️ **完全IaC**: CDKによる全リソースの一元管理（Gateway Targets含む）
+- 🏗️ **完全IaC**: CDKによる全リソースの一元管理
 - ✅ **テスト完備**: 単体テスト + 統合テストによる品質保証
-- 🌍 **環境分離**: Dev/Stage/Prod環境の完全分離とログレベル制御
+- 🌍 **環境分離**: Dev/Stage/Prod環境の完全分離
 
-## 🌍 環境設定
-
-### 対応環境
-
-Healthmate-HealthManager は以下の3つの環境をサポートします：
-
-- **dev**: 開発環境（デフォルト）- DEBUGログレベル
-- **stage**: ステージング環境 - INFOログレベル  
-- **prod**: 本番環境 - WARNINGログレベル
-
-### 環境変数
-
-| 変数名 | 説明 | デフォルト値 | 例 |
-|--------|------|-------------|-----|
-| `HEALTHMATE_ENV` | デプロイ環境 | `dev` | `dev`, `stage`, `prod` |
-| `AWS_REGION` | AWSリージョン | `us-west-2` | `us-west-2` |
-| `LOG_LEVEL` | ログレベル | 環境により自動設定 | `DEBUG`, `INFO`, `WARNING` |
-
-### 環境別リソース命名
-
-| 環境 | DynamoDBテーブル | Lambda関数 | Gateway名 |
-|------|-----------------|------------|-----------|
-| dev | `healthmate-users-dev` | `healthmate-UserLambda-dev` | `healthmate-gateway-dev` |
-| stage | `healthmate-users-stage` | `healthmate-UserLambda-stage` | `healthmate-gateway-stage` |
-| prod | `healthmate-users-prod` | `healthmate-UserLambda-prod` | `healthmate-gateway-prod` |
-
-## 🏗️ Healthmateエコシステム
+## �️ Healthmateエコシステム
 
 ```mermaid
 graph TB
-    A[HealthmateUI<br/>Web Frontend] --> B[Healthmate-HealthManager<br/>MCP Server]
-    C[HealthCoachAI<br/>AI Agent] --> B
+    A[Healthmate-Frontend<br/>React Frontend] --> B[Healthmate-HealthManager<br/>MCP Server]
+    C[Healthmate-CoachAI<br/>AI Agent] --> B
     D[ChatGPT] --> B
     E[Claude] --> B
     F[Other AI Clients] --> B
@@ -60,8 +34,10 @@ graph TB
 ```
 
 - **Healthmate-HealthManager**（このプロジェクト）: 健康情報管理MCPサーバー
-- **HealthCoachAI**（別プロジェクト）: AI健康コーチエージェント
-- **HealthmateUI**（別プロジェクト）: Webフロントエンドアプリケーション
+- **Healthmate-CoachAI**: AI健康コーチエージェント
+- **Healthmate-Frontend**: Reactフロントエンドアプリケーション
+- **Healthmate-Core**: 認証基盤サービス
+- **Healthmate-App**: 統合デプロイメント管理
 
 ## 🛠️ 技術スタック
 
@@ -73,18 +49,25 @@ graph TB
 - **Testing**: pytest + hypothesis (Property-Based Testing)
 - **Protocol**: Model Context Protocol (MCP)
 
-## 主な機能
+## 📋 主な機能
 
+### 健康データ管理
 - **ユーザー管理**: ユーザー情報の作成、更新、取得
-- **健康目標管理**: 長期的な健康目標（100歳まで健康寿命、アスリート体型など）の管理
-- **健康ポリシー管理**: 具体的な行動ルール（ローカーボダイエット、16時間ファスティングなど）の管理
-- **健康悩み管理**: 身体的・精神的な健康上の悩み（ストレス、睡眠不足、慢性痛など）の記録と管理
-- **活動記録管理**: 日々の健康活動（体重、食事、運動、気分など）の記録と取得
-- **身体測定値管理**: 体重、身長、体脂肪率の記録と履歴管理（Latest/Oldest自動管理）
+- **健康目標管理**: 長期的な健康目標の設定と進捗管理
+- **健康ポリシー管理**: 具体的な行動ルールの定義と管理
+- **健康悩み管理**: 身体的・精神的な健康上の悩みの記録と管理
+- **活動記録管理**: 日々の健康活動の記録と履歴管理
+- **身体測定値管理**: 体重、身長、体脂肪率の記録と履歴管理
+- **日記管理**: 毎日の振り返りと気分スコアの記録
 
-## MCPツール
+### AI連携機能
+- **MCP準拠API**: 標準化されたプロトコルによるAI連携
+- **M2M認証**: セキュアなマシン間認証
+- **リアルタイム応答**: 低レイテンシーでの健康データ提供
 
-Healthmate-HealthManagerは以下の27個のMCPツールを提供します：
+## 🔧 MCPツール一覧
+
+Healthmate-HealthManagerは以下の**32個**のMCPツールを提供します：
 
 ### UserManagement (3ツール)
 - `AddUser`: 新しいユーザー情報を作成
@@ -118,18 +101,25 @@ Healthmate-HealthManagerは以下の27個のMCPツールを提供します：
 - `GetActivitiesInRange`: 指定した期間の活動履歴を取得
 
 ### BodyMeasurementManagement (6ツール)
-- `AddBodyMeasurement`: 身体測定値（体重、身長、体脂肪率）を記録
+- `AddBodyMeasurement`: 身体測定値を記録
 - `UpdateBodyMeasurement`: 既存の測定記録を更新
 - `DeleteBodyMeasurement`: 測定記録を削除
 - `GetLatestMeasurements`: 最新の測定値を取得
 - `GetOldestMeasurements`: 最古の測定値を取得
 - `GetMeasurementHistory`: 指定期間の測定履歴を取得
 
+### JournalManagement (5ツール) 🆕
+- `AddJournal`: 新しい日記エントリーを作成または既存エントリーに追記
+- `GetJournal`: 指定した日付の日記エントリーを取得
+- `GetJournalsInRange`: 指定した日付範囲の日記エントリーを取得（最大365日間）
+- `UpdateJournal`: 既存の日記エントリーを完全置換
+- `DeleteJournal`: 日記エントリーを削除
+
 ## 🏛️ アーキテクチャ
 
 ```mermaid
 sequenceDiagram
-    participant Client as AI Client<br/>(ChatGPT/Claude/HealthCoachAI)
+    participant Client as AI Client<br/>(ChatGPT/Claude/CoachAI)
     participant Cognito as Amazon Cognito
     participant Gateway as AgentCore Gateway
     participant Lambda as AWS Lambda
@@ -153,9 +143,7 @@ sequenceDiagram
 - Python 3.12+
 - Node.js 18+ (AWS CDK用)
 - AWS CLI v2 (設定済み)
-- AWS CDK Bootstrap (us-west-2リージョン)
-
-> **注意**: 2024年12月のリファクタリングにより、Gateway TargetsもCDKで管理されるようになりました。手動スクリプトは不要です。
+- AWS CDK Bootstrap (対象リージョン)
 
 ### インストール
 
@@ -177,66 +165,17 @@ cd cdk && npm install && cd ..
 
 ### 環境別デプロイ
 
-#### 方法1: 完全自動デプロイ（推奨）
-
 ```bash
-# 開発環境（デフォルト）
-export HEALTHMATE_ENV=dev
-./scripts/deploy-full-stack.sh
-
-# ステージング環境
-export HEALTHMATE_ENV=stage
-./scripts/deploy-full-stack.sh
-
-# 本番環境
-export HEALTHMATE_ENV=prod
-./scripts/deploy-full-stack.sh
-```
-
-#### 方法2: 手動ステップ実行
-
-```bash
-# 環境変数を設定（オプション）
+# 環境変数を設定
 export HEALTHMATE_ENV=dev  # dev, stage, prod
 
-# Step 1: CDKスタックをデプロイ
+# CDKスタックをデプロイ
 cd cdk
 cdk deploy --require-approval never
 
-# Step 2: AgentCore Identity (OAuth2 Credential Provider) を作成
+# AgentCore Identity (OAuth2 Credential Provider) を作成
 cd ..
 ./scripts/create-credential-provider.sh
-```
-
-### 環境設定の確認
-
-```bash
-# 現在の環境設定を確認
-python test_environment_config.py
-
-# 環境別リソース確認
-aws dynamodb list-tables --query 'TableNames[?contains(@, `healthmate`)]'
-aws lambda list-functions --query 'Functions[?contains(FunctionName, `healthmate`)]'
-```
-
-### アンデプロイ
-
-#### 方法1: 完全自動削除（推奨）
-
-```bash
-# AgentCore Identity + CDK の完全削除
-./scripts/destroy-full-stack.sh
-```
-
-#### 方法2: 手動ステップ実行
-
-```bash
-# Step 1: AgentCore Identity (OAuth2 Credential Provider) を削除
-./scripts/delete-credential-provider.sh
-
-# Step 2: CDKスタックを削除
-cd cdk
-cdk destroy --force
 ```
 
 ### テスト実行
@@ -245,8 +184,19 @@ cdk destroy --force
 # 単体テストを実行
 pytest tests/unit/ -v
 
-# 統合テストを実行
+# 統合テストを実行（全32ツール）
 python test_mcp_client.py
+```
+
+### アンデプロイ
+
+```bash
+# AgentCore Identity を削除
+./scripts/delete-credential-provider.sh
+
+# CDKスタックを削除
+cd cdk
+cdk destroy --force
 ```
 
 ## 📁 プロジェクト構成
@@ -264,49 +214,71 @@ Healthmate-HealthManager/
 │   ├── health_policy/handler.py # 健康ポリシー管理 Lambda
 │   ├── health_concern/handler.py # 健康悩み管理 Lambda
 │   ├── activity/handler.py      # 活動記録管理 Lambda
-│   └── body_measurement/handler.py # 身体測定値管理 Lambda
+│   ├── body_measurement/handler.py # 身体測定値管理 Lambda
+│   └── journal/handler.py       # 日記管理 Lambda 🆕
 ├── mcp-schema/                  # MCP ツールスキーマ定義
 │   ├── user-management-mcp-schema.json
 │   ├── health-goal-management-mcp-schema.json
 │   ├── health-policy-management-mcp-schema.json
 │   ├── health-concern-management-mcp-schema.json
 │   ├── activity-management-mcp-schema.json
-│   └── body-measurement-mcp-schema.json
+│   ├── body-measurement-mcp-schema.json
+│   └── journal-management-mcp-schema.json 🆕
 ├── scripts/                     # デプロイ・管理スクリプト
 │   ├── create-credential-provider.sh    # AgentCore Identity作成
 │   ├── delete-credential-provider.sh    # AgentCore Identity削除
-│   ├── deploy-full-stack.sh            # 完全デプロイ（CDK + Identity）
-│   └── destroy-full-stack.sh           # 完全削除（Identity + CDK）
+│   ├── deploy-full-stack.sh            # 完全デプロイ
+│   └── destroy-full-stack.sh           # 完全削除
 ├── tests/                       # テストスイート
 │   ├── unit/                    # 単体テスト
 │   └── integration/             # 統合テスト
 ├── .kiro/specs/                 # 仕様書・設計書
 │   ├── m2m-authentication-refactor/
-│   │   ├── requirements.md      # M2M認証要件
-│   │   ├── design.md           # M2M認証設計
-│   │   └── tasks.md            # 実装タスク
-│   └── body-measurements/       # 身体測定値機能仕様
-│       ├── requirements.md      # 身体測定値要件
-│       ├── design.md           # 身体測定値設計
+│   ├── body-measurements/
+│   └── journal-management/      # 日記管理機能仕様 🆕
+│       ├── requirements.md      # 日記管理要件
+│       ├── design.md           # 日記管理設計
 │       └── tasks.md            # 実装タスク
-
-├── test_mcp_client.py          # 統合テストクライアント
+├── test_mcp_client.py          # 統合テストクライアント（全32ツール対応）
 ├── requirements.txt            # Python 依存関係
 ├── pytest.ini                 # テスト設定
-├── MCP_API_SPECIFICATION.md    # API 仕様書
-├── SETUP.md                    # セットアップガイド
 └── README.md                   # このファイル
 ```
 
 ## 📖 ドキュメント
 
-- **[MCPスキーマ](mcp-schema/)**: 全MCPツールのAPI仕様（JSON Schema形式）
-- **[M2M認証要件](.kiro/specs/m2m-authentication-refactor/requirements.md)**: M2M認証システム要件の詳細
-- **[M2M認証設計](.kiro/specs/m2m-authentication-refactor/design.md)**: M2M認証アーキテクチャと設計決定
-- **[実装タスク](.kiro/specs/m2m-authentication-refactor/tasks.md)**: M2M認証リファクタリングの開発進捗と実装計画
-- **[身体測定値要件](.kiro/specs/body-measurements/requirements.md)**: 身体測定値記録機能の要件定義
-- **[身体測定値設計](.kiro/specs/body-measurements/design.md)**: 身体測定値管理システムの設計仕様
-- **[身体測定値タスク](.kiro/specs/body-measurements/tasks.md)**: 身体測定値機能の実装進捗
+### API仕様
+- **[MCPスキーマ](mcp-schema/)**: 全32個のMCPツールのAPI仕様（JSON Schema形式）
+
+### 機能仕様書
+- **[M2M認証](.kiro/specs/m2m-authentication-refactor/)**: M2M認証システムの要件・設計・実装
+- **[身体測定値管理](.kiro/specs/body-measurements/)**: 身体測定値記録機能の要件・設計・実装
+- **[日記管理](.kiro/specs/journal-management/)**: 日記管理機能の要件・設計・実装 🆕
+
+### 日記管理機能の詳細
+
+日記管理機能は、ユーザーが毎日の振り返りを記録し、メンタルヘルスの傾向を追跡できる機能です：
+
+#### 主な特徴
+- **日記エントリー管理**: 日付ごとの日記作成・更新・削除
+- **気分スコア**: 1（悪い）から5（良い）までの5段階評価
+- **タグ管理**: AIが自動生成する分析用タグ（PascalCase形式）
+- **追記機能**: 既存エントリーへの内容追加
+- **日付範囲検索**: 最大365日間の日記履歴取得
+- **データ検証**: 日付形式、気分スコア、コンテンツ長の検証
+
+#### データ構造
+```json
+{
+  "userId": "user-12345",
+  "date": "2025-12-28",
+  "content": "今日は健康管理システムのテストを実行しました...",
+  "moodScore": 4,
+  "tags": ["Coding", "Testing", "Happy", "Productive"],
+  "createdAt": "2025-12-28T00:00:00Z",
+  "updatedAt": "2025-12-28T12:00:00Z"
+}
+```
 
 ## 🔐 M2M認証システム
 
