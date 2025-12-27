@@ -1151,6 +1151,8 @@ class HealthManagerMCPTestClient:
         # テスト19: BodyMeasurementManagement.GetLatestMeasurements
         print("\n--- 19. BodyMeasurementManagement.GetLatestMeasurements テスト ---")
         print("   🧪 バグ修正検証: 最新の測定日時のデータがlatestとして取得されるか")
+        print("   📊 データ登録順序: 2025/12/27(70.0kg) → 2025/12/22(68.0kg)")
+        print("   🎯 期待結果: latest = 70.0kg (2025/12/27のデータ)")
         try:
             mcp_request = {
                 "jsonrpc": "2.0",
@@ -1185,17 +1187,18 @@ class HealthManagerMCPTestClient:
                                     latest_weight = measurements.get('weight')
                                     latest_update_time = measurements.get('last_weight_update')
                                     
+                                    print(f"   📊 実際の結果:")
+                                    print(f"      最新体重: {latest_weight}kg")
+                                    print(f"      最新測定日時: {latest_update_time}")
+                                    
                                     if latest_weight == 70.0:
-                                        print(f"   ✅ 最新体重確認: {latest_weight}kg")
-                                        print(f"   ✅ 最新測定日時: {latest_update_time}")
-                                        if latest_update_time and newer_time in latest_update_time:
-                                            print(f"   ✅ バグ修正成功: 測定日時に基づく正しいlatest判定")
-                                        else:
-                                            print(f"   ⚠️ 測定日時が期待値と異なります: 期待{newer_time}を含む")
+                                        print(f"   ✅ バグ修正成功: 測定日時に基づく正しいlatest判定")
+                                        print(f"      期待通り2025/12/27のデータ(70.0kg)が最新として取得されました")
                                     else:
                                         print(f"   ❌ バグ修正失敗: 最新体重が期待値と異なります")
                                         print(f"      期待: 70.0kg (2025/12/27のデータ)")
                                         print(f"      実際: {latest_weight}kg")
+                                        print(f"   🔍 原因分析: 登録順序ではなく測定日時で判定されているか確認が必要")
                                         success = False
                                 except json.JSONDecodeError:
                                     pass
@@ -1269,7 +1272,12 @@ class HealthManagerMCPTestClient:
         # テスト21: BodyMeasurementManagement.GetMeasurementHistory
         print("\n--- 21. BodyMeasurementManagement.GetMeasurementHistory テスト ---")
         try:
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            # テストデータの日付範囲に合わせて設定
+            start_date = "2025-12-20"  # 2025/12/22より前
+            end_date = "2025-12-30"    # 2025/12/27より後
+            print(f"   📅 検索範囲: {start_date} ～ {end_date}")
+            print(f"   🎯 期待: 2件のデータ (2025/12/22, 2025/12/27)")
+            
             mcp_request = {
                 "jsonrpc": "2.0",
                 "method": "tools/call",
@@ -1277,8 +1285,8 @@ class HealthManagerMCPTestClient:
                     "name": "BodyMeasurementManagement___GetMeasurementHistory",
                     "arguments": {
                         "userId": self.user_id,
-                        "start_date": yesterday,
-                        "end_date": today,
+                        "start_date": start_date,
+                        "end_date": end_date,
                         "limit": 10
                     }
                 },
@@ -1294,7 +1302,7 @@ class HealthManagerMCPTestClient:
                     success = False
                 else:
                     print(f"✅ GetMeasurementHistory成功")
-                    # 3件の記録があることを確認
+                    # 2件の記録があることを確認
                     if 'result' in result and 'content' in result['result']:
                         content = result['result']['content']
                         if content and isinstance(content, list) and len(content) > 0:
@@ -1304,12 +1312,25 @@ class HealthManagerMCPTestClient:
                                     parsed_content = json.loads(text_content)
                                     measurements = parsed_content.get('measurements', [])
                                     count = parsed_content.get('count', 0)
-                                    if count >= 3:
+                                    
+                                    print(f"   📊 取得された測定記録数: {count}件")
+                                    
+                                    if count >= 2:
                                         print(f"   ✅ 測定記録数確認: {count}件")
+                                        # 各記録の詳細を表示
+                                        for i, measurement in enumerate(measurements[:2]):
+                                            measurement_time = measurement.get('measurement_time', 'Unknown')
+                                            weight = measurement.get('weight', 'Unknown')
+                                            print(f"      記録{i+1}: {measurement_time} - {weight}kg")
                                     else:
-                                        print(f"   ⚠️ 測定記録数が期待値より少ないです: 期待3件以上, 実際{count}件")
+                                        print(f"   ❌ 測定記録数が期待値より少ないです: 期待2件以上, 実際{count}件")
+                                        print(f"   🔍 デバッグ情報:")
+                                        print(f"      検索範囲: {start_date} ～ {end_date}")
+                                        print(f"      登録データ: 2025/12/22, 2025/12/27")
+                                        success = False
                                 except json.JSONDecodeError:
-                                    pass
+                                    print(f"   ❌ レスポンス解析失敗")
+                                    success = False
             else:
                 print(f"❌ GetMeasurementHistory失敗: HTTP {response.status_code}")
                 success = False
@@ -1321,9 +1342,10 @@ class HealthManagerMCPTestClient:
         # テスト22: BodyMeasurementManagement.UpdateBodyMeasurement
         print("\n--- 22. BodyMeasurementManagement.UpdateBodyMeasurement テスト ---")
         try:
-            if len(test_measurement_ids) >= 3:
-                # 最新の記録（3回目）を更新
-                latest_measurement_id = test_measurement_ids[2]
+            if len(test_measurement_ids) >= 2:
+                # 最新の記録（1回目: 2025/12/27）を更新
+                latest_measurement_id = test_measurement_ids[0]  # 2025/12/27のデータ
+                print(f"   🎯 更新対象: {latest_measurement_id} (2025/12/27のデータ)")
                 
                 mcp_request = {
                     "jsonrpc": "2.0",
@@ -1333,7 +1355,7 @@ class HealthManagerMCPTestClient:
                         "arguments": {
                             "userId": self.user_id,
                             "measurement_id": latest_measurement_id,
-                            "weight": 68.5  # 67.0から68.5に更新
+                            "weight": 71.5  # 70.0から71.5に更新
                         }
                     },
                     "id": 22
@@ -1348,6 +1370,7 @@ class HealthManagerMCPTestClient:
                         success = False
                     else:
                         print(f"✅ UpdateBodyMeasurement成功")
+                        print(f"   📊 体重を70.0kg → 71.5kgに更新")
                         
                         # 最新値が更新されていることを確認
                         latest_request = {
@@ -1375,18 +1398,21 @@ class HealthManagerMCPTestClient:
                                             parsed_content = json.loads(text_content)
                                             measurements = parsed_content.get('measurements', {})
                                             updated_weight = measurements.get('weight')
-                                            # 現在時刻のデータ(69.0kg)が最新になっているはず
-                                            if updated_weight == 69.0:
-                                                print(f"   ✅ Latest値確認: {updated_weight}kg (現在時刻のデータが最新)")
+                                            if updated_weight == 71.5:
+                                                print(f"   ✅ Latest値更新確認: {updated_weight}kg")
                                             else:
-                                                print(f"   ⚠️ Latest値が期待値と異なります: 期待69.0kg, 実際{updated_weight}kg")
+                                                print(f"   ❌ Latest値が更新されていません: 期待71.5kg, 実際{updated_weight}kg")
+                                                success = False
                                         except json.JSONDecodeError:
                                             pass
                 else:
                     print(f"❌ UpdateBodyMeasurement失敗: HTTP {response.status_code}")
                     success = False
             else:
-                print("⚠️ UpdateBodyMeasurement スキップ: measurement_idが不足しています")
+                print(f"❌ UpdateBodyMeasurement スキップ: measurement_idが不足しています")
+                print(f"   取得されたID数: {len(test_measurement_ids)}")
+                print(f"   必要なID数: 2")
+                success = False
                 
         except Exception as e:
             print(f"❌ UpdateBodyMeasurement例外: {str(e)}")
@@ -1395,9 +1421,10 @@ class HealthManagerMCPTestClient:
         # テスト23: BodyMeasurementManagement.DeleteBodyMeasurement
         print("\n--- 23. BodyMeasurementManagement.DeleteBodyMeasurement テスト ---")
         try:
-            if len(test_measurement_ids) >= 3:
-                # 最古の記録（1回目）を削除
-                oldest_measurement_id = test_measurement_ids[0]
+            if len(test_measurement_ids) >= 2:
+                # 最古の記録（2回目: 2025/12/22）を削除
+                oldest_measurement_id = test_measurement_ids[1]  # 2025/12/22のデータ
+                print(f"   🎯 削除対象: {oldest_measurement_id} (2025/12/22のデータ)")
                 
                 mcp_request = {
                     "jsonrpc": "2.0",
@@ -1421,8 +1448,9 @@ class HealthManagerMCPTestClient:
                         success = False
                     else:
                         print(f"✅ DeleteBodyMeasurement成功")
+                        print(f"   🗑️ 2025/12/22のデータを削除")
                         
-                        # 最古値が更新されていることを確認（2回目の記録が新しい最古になる）
+                        # 最古値が更新されていることを確認（2025/12/27のデータが唯一の記録になる）
                         oldest_request = {
                             "jsonrpc": "2.0",
                             "method": "tools/call",
@@ -1448,18 +1476,25 @@ class HealthManagerMCPTestClient:
                                             parsed_content = json.loads(text_content)
                                             measurements = parsed_content.get('measurements', {})
                                             new_oldest_weight = measurements.get('weight')
-                                            # 削除後は現在時刻のデータ(69.0kg)が最古になるはず
-                                            if new_oldest_weight == 69.0:
+                                            oldest_time = measurements.get('first_weight_record')
+                                            
+                                            # 削除後は2025/12/27のデータ(71.5kg)が唯一の記録になる
+                                            if new_oldest_weight == 71.5:
                                                 print(f"   ✅ Oldest値更新確認: {new_oldest_weight}kg")
+                                                print(f"   ✅ 唯一の記録: {oldest_time}")
                                             else:
-                                                print(f"   ⚠️ Oldest値が期待値と異なります: 期待69.0kg, 実際{new_oldest_weight}kg")
+                                                print(f"   ❌ Oldest値が期待値と異なります: 期待71.5kg, 実際{new_oldest_weight}kg")
+                                                success = False
                                         except json.JSONDecodeError:
                                             pass
                 else:
                     print(f"❌ DeleteBodyMeasurement失敗: HTTP {response.status_code}")
                     success = False
             else:
-                print("⚠️ DeleteBodyMeasurement スキップ: measurement_idが不足しています")
+                print(f"❌ DeleteBodyMeasurement スキップ: measurement_idが不足しています")
+                print(f"   取得されたID数: {len(test_measurement_ids)}")
+                print(f"   必要なID数: 2")
+                success = False
                 
         except Exception as e:
             print(f"❌ DeleteBodyMeasurement例外: {str(e)}")
