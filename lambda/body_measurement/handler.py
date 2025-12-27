@@ -406,9 +406,16 @@ def update_latest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         
         for measurement_type, value in new_measurement.items():
             if measurement_type in ['weight', 'height', 'body_fat_percentage']:
-                # 新しい測定値で更新
-                updated_latest[measurement_type] = value
-                updated_latest[f'last_{measurement_type}_update'] = measurement_time
+                # measurement_timeを比較して、より新しい場合のみ更新
+                existing_last_update = updated_latest.get(f'last_{measurement_type}_update')
+                
+                if not existing_last_update or measurement_time > existing_last_update:
+                    # 新しい測定時刻の場合のみ更新
+                    updated_latest[measurement_type] = value
+                    updated_latest[f'last_{measurement_type}_update'] = measurement_time
+                    logger.debug(f"Updated latest {measurement_type} for user {user_id}: {measurement_time} > {existing_last_update}")
+                else:
+                    logger.debug(f"Skipped updating latest {measurement_type} for user {user_id}: {measurement_time} <= {existing_last_update}")
         
         updated_latest['updated_at'] = datetime.now(timezone.utc).isoformat()
         table.put_item(Item=updated_latest)
@@ -421,7 +428,7 @@ def update_latest_record(user_id: str, new_measurement: Dict[str, Any], measurem
 
 def update_oldest_record(user_id: str, new_measurement: Dict[str, Any], measurement_time: str) -> None:
     """
-    Oldest レコードを更新（新しい測定タイプの場合のみ）
+    Oldest レコードを更新（新しい測定タイプの場合、または既存タイプでより古い測定時刻の場合）
     
     Args:
         user_id: ユーザーID
@@ -459,15 +466,25 @@ def update_oldest_record(user_id: str, new_measurement: Dict[str, Any], measurem
             table.put_item(Item=oldest_record)
             return
         
-        # 既存のOldest レコードに新しい測定タイプを追加
+        # 既存のOldest レコードを更新
         updated_oldest = current_oldest.copy()
         
         for measurement_type, value in new_measurement.items():
             if measurement_type in ['weight', 'height', 'body_fat_percentage']:
-                # まだ記録されていない測定タイプの場合のみ追加
-                if measurement_type not in updated_oldest:
+                existing_first_record = updated_oldest.get(f'first_{measurement_type}_record')
+                
+                if not existing_first_record:
+                    # まだ記録されていない測定タイプの場合は追加
                     updated_oldest[measurement_type] = value
                     updated_oldest[f'first_{measurement_type}_record'] = measurement_time
+                    logger.debug(f"Added new measurement type {measurement_type} to oldest record for user {user_id}")
+                elif measurement_time < existing_first_record:
+                    # より古い測定時刻の場合は更新
+                    updated_oldest[measurement_type] = value
+                    updated_oldest[f'first_{measurement_type}_record'] = measurement_time
+                    logger.debug(f"Updated oldest {measurement_type} for user {user_id}: {measurement_time} < {existing_first_record}")
+                else:
+                    logger.debug(f"Skipped updating oldest {measurement_type} for user {user_id}: {measurement_time} >= {existing_first_record}")
         
         table.put_item(Item=updated_oldest)
         
