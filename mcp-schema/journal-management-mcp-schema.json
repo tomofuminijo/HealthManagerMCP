@@ -1,0 +1,144 @@
+[
+  {
+    "name": "GetJournal",
+    "description": "指定した日付の日記エントリーを取得する。存在しない場合は適切なエラーメッセージを返す。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "取得する日記の日付（YYYY-MM-DD形式）"
+        }
+      },
+      "required": ["userId", "date"]
+    }
+  },
+  {
+    "name": "GetJournalsInRange",
+    "description": "指定した日付範囲の日記エントリーを取得する（最大365日間）。時系列順でソートして返す。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "startDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "開始日（YYYY-MM-DD形式）"
+        },
+        "endDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "終了日（YYYY-MM-DD形式）"
+        }
+      },
+      "required": ["userId", "startDate", "endDate"]
+    }
+  },
+  {
+    "name": "AddJournal",
+    "description": "新しい日記エントリーを作成する、または既存のエントリーに内容を追記する。日付が省略された場合は現在の日付を使用。AIクライアントが提供するタグをそのまま保存。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "日記の日付（YYYY-MM-DD形式）。省略時は今日の日付を使用"
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "日記の内容・振り返り本文"
+        },
+        "moodScore": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "気分スコア（1: 悪い ～ 5: 良い）。省略可能"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][a-zA-Z0-9]*$"
+          },
+          "minItems": 0,
+          "maxItems": 10,
+          "description": "content に基づき3~4個のタグを自動で生成すること（PascalCase英語形式）。例: [\"Coding\", \"Happy\", \"Productive\", \"Sunny\"]"
+        }
+      },
+      "required": ["userId", "content"]
+    }
+  },
+  {
+    "name": "UpdateJournal",
+    "description": "既存の日記エントリーを完全に置換する。指定されたフィールドのみ更新し、updatedAtタイムスタンプを更新する。createdAtは保持される。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "更新する日記の日付（YYYY-MM-DD形式）"
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "新しい日記の内容・振り返り本文"
+        },
+        "moodScore": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "新しい気分スコア（1: 悪い ～ 5: 良い）"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][a-zA-Z0-9]*$"
+          },
+          "minItems": 0,
+          "maxItems": 10,
+          "description": "content に基づき3~4個のタグを自動で生成すること（PascalCase英語形式）。例: [\"Coding\", \"Happy\", \"Productive\", \"Sunny\"]"
+        }
+      },
+      "required": ["userId", "date"]
+    }
+  },
+  {
+    "name": "DeleteJournal",
+    "description": "指定した日付の日記エントリーを削除する。削除されたエントリーは復旧できない。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "削除する日記の日付（YYYY-MM-DD形式）"
+        }
+      },
+      "required": ["userId", "date"]
+    }
+  }
+]

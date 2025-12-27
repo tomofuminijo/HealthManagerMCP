@@ -452,6 +452,24 @@ class HealthmateHealthManagerStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
+        # 日記管理テーブル
+        self.journals_table = dynamodb.Table(
+            self,
+            "JournalsTable",
+            table_name=f"healthmate-journals{self.config_provider.get_environment_suffix()}",
+            partition_key=dynamodb.Attribute(
+                name="userId", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="date", type=dynamodb.AttributeType.STRING  # YYYY-MM-DD形式
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,  # 開発用：本番環境ではRETAINに変更
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True
+            ),
+        )
+
         # BodyMeasurementLambda用のCloudWatch Logsロググループ
         body_measurement_log_group = logs.LogGroup(
             self,
@@ -512,6 +530,36 @@ class HealthmateHealthManagerStack(Stack):
         # HealthConcernLambdaにDynamoDBテーブルへのアクセス権限を付与
         self.concerns_table.grant_read_write_data(self.health_concern_lambda)
 
+        # JournalLambda用のCloudWatch Logsロググループ
+        journal_log_group = logs.LogGroup(
+            self,
+            "JournalLambdaLogGroup",
+            log_group_name=f"/aws/lambda/healthmanagermcp-journal{self.config_provider.get_environment_suffix()}",
+            retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
+            removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
+        )
+
+        # JournalLambda関数
+        self.journal_lambda = lambda_.Function(
+            self,
+            "JournalLambda",
+            function_name=f"healthmanagermcp-journal{self.config_provider.get_environment_suffix()}",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="journal.handler.lambda_handler",
+            code=lambda_.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            environment={
+                "JOURNALS_TABLE_NAME": self.journals_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
+            },
+            log_group=journal_log_group,  # ロググループを明示的に指定
+        )
+
+        # JournalLambdaにDynamoDBテーブルへのアクセス権限を付与
+        self.journals_table.grant_read_write_data(self.journal_lambda)
+
 
 
         # ========================================
@@ -548,6 +596,7 @@ class HealthmateHealthManagerStack(Stack):
                     self.activity_lambda.function_arn,
                     self.body_measurement_lambda.function_arn,
                     self.health_concern_lambda.function_arn,
+                    self.journal_lambda.function_arn,
                 ],
             )
         )
@@ -754,6 +803,32 @@ class HealthmateHealthManagerStack(Stack):
             )
         )
 
+        # JournalManagement Target
+        journal_mcp_schema = load_mcp_schema("journal-management-mcp-schema.json")
+        
+        self.journal_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "JournalManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="JournalManagement",
+            description="ユーザーの日記（毎日の振り返り）を管理する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.journal_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=journal_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
+
         # ========================================
         # Lambda Permissions
         # ========================================
@@ -791,6 +866,12 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         self.health_concern_lambda.add_permission(
+            "AllowAgentCoreGatewayInvoke",
+            principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            action="lambda:InvokeFunction",
+        )
+
+        self.journal_lambda.add_permission(
             "AllowAgentCoreGatewayInvoke",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
             action="lambda:InvokeFunction",
@@ -927,6 +1008,14 @@ class HealthmateHealthManagerStack(Stack):
             export_name=f"Healthmate-HealthManager-HealthConcernLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
+        CfnOutput(
+            self,
+            "JournalLambdaArn",
+            value=self.journal_lambda.function_arn,
+            description="Journal Lambda Function ARN",
+            export_name=f"Healthmate-HealthManager-JournalLambdaArn{self.config_provider.get_environment_suffix()}"
+        )
+
         # DynamoDBテーブル名
         CfnOutput(
             self,
@@ -974,6 +1063,14 @@ class HealthmateHealthManagerStack(Stack):
             value=self.concerns_table.table_name,
             description="Concerns DynamoDB Table Name",
             export_name=f"Healthmate-HealthManager-ConcernsTableName{self.config_provider.get_environment_suffix()}"
+        )
+
+        CfnOutput(
+            self,
+            "JournalsTableName",
+            value=self.journals_table.table_name,
+            description="Journals DynamoDB Table Name",
+            export_name=f"Healthmate-HealthManager-JournalsTableName{self.config_provider.get_environment_suffix()}"
         )
 
         # M2M認証用のJWKS URL
