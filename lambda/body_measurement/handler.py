@@ -248,8 +248,8 @@ def add_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # 通常の測定記録を保存
         measurement_id = measurement_time
         measurement_record = {
-            'PK': user_id,
-            'SK': f'MEASUREMENT#{measurement_id}',
+            'userId': user_id,
+            'measurementId': f'MEASUREMENT#{measurement_id}',
             **measurement_data,
             'measurement_time': measurement_time,
             'created_at': datetime.now(timezone.utc).isoformat()
@@ -296,7 +296,7 @@ def update_latest_oldest_records(user_id: str, new_measurement: Dict[str, Any], 
         existing_measurements = get_all_user_measurements(user_id)
         regular_measurements = [
             r for r in existing_measurements 
-            if not r['SK'].endswith('#latest') and not r['SK'].endswith('#oldest')
+            if not r['measurementId'].endswith('#latest') and not r['measurementId'].endswith('#oldest')
         ]
         
         is_first_measurement = len(regular_measurements) <= 1  # 今追加したレコードを含む
@@ -331,8 +331,8 @@ def handle_first_measurement(user_id: str, measurement: Dict[str, Any], measurem
     
     # Latest レコード作成
     latest_record = {
-        'PK': user_id,
-        'SK': 'MEASUREMENT#latest',
+        'userId': user_id,
+        'measurementId': 'MEASUREMENT#latest',
         'record_type': 'latest',
         **base_record_data,
         'updated_at': datetime.now(timezone.utc).isoformat()
@@ -340,8 +340,8 @@ def handle_first_measurement(user_id: str, measurement: Dict[str, Any], measurem
     
     # Oldest レコード作成（同じデータ）
     oldest_record = {
-        'PK': user_id,
-        'SK': 'MEASUREMENT#oldest',
+        'userId': user_id,
+        'measurementId': 'MEASUREMENT#oldest',
         'record_type': 'oldest',
         **base_record_data
     }
@@ -374,7 +374,7 @@ def update_latest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         # 現在のLatest レコードを取得
         response = table.query(
             IndexName='RecordTypeIndex',
-            KeyConditionExpression='PK = :pk AND record_type = :rt',
+            KeyConditionExpression='userId = :pk AND record_type = :rt',
             ExpressionAttributeValues={
                 ':pk': f'{user_id}',
                 ':rt': 'latest'
@@ -386,8 +386,8 @@ def update_latest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         if not current_latest:
             # Latest レコードが存在しない場合は新規作成
             latest_record = {
-                'PK': f'{user_id}',
-                'SK': 'MEASUREMENT#latest',
+                'userId': f'{user_id}',
+                'measurementId': 'MEASUREMENT#latest',
                 'record_type': 'latest',
                 **new_measurement,
                 'updated_at': datetime.now(timezone.utc).isoformat()
@@ -432,7 +432,7 @@ def update_oldest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         # 現在のOldest レコードを取得
         response = table.query(
             IndexName='RecordTypeIndex',
-            KeyConditionExpression='PK = :pk AND record_type = :rt',
+            KeyConditionExpression='userId = :pk AND record_type = :rt',
             ExpressionAttributeValues={
                 ':pk': f'{user_id}',
                 ':rt': 'oldest'
@@ -444,8 +444,8 @@ def update_oldest_record(user_id: str, new_measurement: Dict[str, Any], measurem
         if not current_oldest:
             # Oldest レコードが存在しない場合は新規作成
             oldest_record = {
-                'PK': f'{user_id}',
-                'SK': 'MEASUREMENT#oldest',
+                'userId': f'{user_id}',
+                'measurementId': 'MEASUREMENT#oldest',
                 'record_type': 'oldest',
                 **new_measurement,
                 'created_at': datetime.now(timezone.utc).isoformat()
@@ -489,7 +489,7 @@ def get_all_user_measurements(user_id: str) -> list:
     """
     try:
         response = table.query(
-            KeyConditionExpression='PK = :pk',
+            KeyConditionExpression='userId = :pk',
             ExpressionAttributeValues={
                 ':pk': f'{user_id}'
             }
@@ -520,7 +520,7 @@ def get_latest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         
         response = table.query(
             IndexName='RecordTypeIndex',
-            KeyConditionExpression='PK = :pk AND record_type = :rt',
+            KeyConditionExpression='userId = :pk AND record_type = :rt',
             ExpressionAttributeValues={
                 ':pk': f'{user_id}',
                 ':rt': 'latest'
@@ -580,7 +580,7 @@ def get_oldest_measurements(parameters: Dict[str, Any]) -> Dict[str, Any]:
         
         response = table.query(
             IndexName='RecordTypeIndex',
-            KeyConditionExpression='PK = :pk AND record_type = :rt',
+            KeyConditionExpression='userId = :pk AND record_type = :rt',
             ExpressionAttributeValues={
                 ':pk': f'{user_id}',
                 ':rt': 'oldest'
@@ -646,7 +646,7 @@ def get_measurement_history(parameters: Dict[str, Any]) -> Dict[str, Any]:
         
         # 日付範囲でのクエリ
         response = table.query(
-            KeyConditionExpression='PK = :pk AND SK BETWEEN :start_sk AND :end_sk',
+            KeyConditionExpression='userId = :pk AND measurementId BETWEEN :start_sk AND :end_sk',
             ExpressionAttributeValues={
                 ':pk': f'{user_id}',
                 ':start_sk': f'MEASUREMENT#{start_date}',
@@ -659,7 +659,7 @@ def get_measurement_history(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # Latest/Oldest レコードを除外
         measurements = [
             item for item in response['Items']
-            if not item['SK'].endswith('#latest') and not item['SK'].endswith('#oldest')
+            if not item['measurementId'].endswith('#latest') and not item['measurementId'].endswith('#oldest')
         ]
         
         # レスポンス用にクリーンアップ
@@ -671,8 +671,8 @@ def get_measurement_history(parameters: Dict[str, Any]) -> Dict[str, Any]:
                     clean_measurement[key] = float(value) if isinstance(value, Decimal) else value
                 elif key in ['measurement_time', 'created_at']:
                     clean_measurement[key] = value
-                elif key == 'SK':
-                    # measurement_id として SK から抽出
+                elif key == 'measurementId':
+                    # measurement_id として measurementId から抽出
                     clean_measurement['measurement_id'] = value.replace('MEASUREMENT#', '')
             result.append(clean_measurement)
         
@@ -740,8 +740,8 @@ def update_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # 既存レコードの存在確認と取得
         response = table.get_item(
             Key={
-                'PK': f'{user_id}',
-                'SK': f'MEASUREMENT#{measurement_id}'
+                'userId': f'{user_id}',
+                'measurementId': f'MEASUREMENT#{measurement_id}'
             }
         )
         
@@ -751,7 +751,7 @@ def update_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         existing_record = response['Item']
         
         # レコードの所有権確認
-        if not existing_record['PK'] == f'{user_id}':
+        if not existing_record['userId'] == f'{user_id}':
             raise ValueError("この測定記録を更新する権限がありません")
         
         # レコードを更新
@@ -811,8 +811,8 @@ def delete_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         # 削除対象レコードの存在確認と取得
         response = table.get_item(
             Key={
-                'PK': f'{user_id}',
-                'SK': f'MEASUREMENT#{measurement_id}'
+                'userId': f'{user_id}',
+                'measurementId': f'MEASUREMENT#{measurement_id}'
             }
         )
         
@@ -822,14 +822,14 @@ def delete_body_measurement(parameters: Dict[str, Any]) -> Dict[str, Any]:
         target_record = response['Item']
         
         # レコードの所有権確認
-        if not target_record['PK'] == f'{user_id}':
+        if not target_record['userId'] == f'{user_id}':
             raise ValueError("この測定記録を削除する権限がありません")
         
         # レコードを削除
         table.delete_item(
             Key={
-                'PK': f'{user_id}',
-                'SK': f'MEASUREMENT#{measurement_id}'
+                'userId': f'{user_id}',
+                'measurementId': f'MEASUREMENT#{measurement_id}'
             }
         )
         
@@ -872,15 +872,15 @@ def recalculate_latest_record_after_update(user_id: str, updated_measurement_id:
         all_measurements = get_all_user_measurements(user_id)
         regular_measurements = [
             r for r in all_measurements 
-            if not r['SK'].endswith('#latest') and not r['SK'].endswith('#oldest')
+            if not r['measurementId'].endswith('#latest') and not r['measurementId'].endswith('#oldest')
         ]
         
         if not regular_measurements:
             # 測定記録がない場合、Latest レコードを削除
             table.delete_item(
                 Key={
-                    'PK': f'{user_id}',
-                    'SK': 'MEASUREMENT#latest'
+                    'userId': f'{user_id}',
+                    'measurementId': 'MEASUREMENT#latest'
                 }
             )
             return
@@ -903,8 +903,8 @@ def recalculate_latest_record_after_update(user_id: str, updated_measurement_id:
         # Latest レコードを更新
         if latest_values:
             latest_record = {
-                'PK': f'{user_id}',
-                'SK': 'MEASUREMENT#latest',
+                'userId': f'{user_id}',
+                'measurementId': 'MEASUREMENT#latest',
                 'record_type': 'latest',
                 **latest_values,
                 **last_update_times,
@@ -931,15 +931,15 @@ def recalculate_latest_record_after_deletion(user_id: str, deleted_measurement_i
         remaining_measurements = get_all_user_measurements(user_id)
         regular_measurements = [
             r for r in remaining_measurements 
-            if not r['SK'].endswith('#latest') and not r['SK'].endswith('#oldest')
+            if not r['measurementId'].endswith('#latest') and not r['measurementId'].endswith('#oldest')
         ]
         
         if not regular_measurements:
             # 測定記録が全て削除された場合、Latest レコードも削除
             table.delete_item(
                 Key={
-                    'PK': f'{user_id}',
-                    'SK': 'MEASUREMENT#latest'
+                    'userId': f'{user_id}',
+                    'measurementId': 'MEASUREMENT#latest'
                 }
             )
             logger.debug(f"Deleted latest record (no measurements left) for user: {user_id}")
@@ -963,8 +963,8 @@ def recalculate_latest_record_after_deletion(user_id: str, deleted_measurement_i
         # Latest レコードを更新
         if latest_values:
             latest_record = {
-                'PK': f'{user_id}',
-                'SK': 'MEASUREMENT#latest',
+                'userId': f'{user_id}',
+                'measurementId': 'MEASUREMENT#latest',
                 'record_type': 'latest',
                 **latest_values,
                 **last_update_times,
@@ -991,15 +991,15 @@ def recalculate_oldest_record_after_deletion(user_id: str, deleted_measurement_i
         remaining_measurements = get_all_user_measurements(user_id)
         regular_measurements = [
             r for r in remaining_measurements 
-            if not r['SK'].endswith('#latest') and not r['SK'].endswith('#oldest')
+            if not r['measurementId'].endswith('#latest') and not r['measurementId'].endswith('#oldest')
         ]
         
         if not regular_measurements:
             # 測定記録が全て削除された場合、Oldest レコードも削除
             table.delete_item(
                 Key={
-                    'PK': f'{user_id}',
-                    'SK': 'MEASUREMENT#oldest'
+                    'userId': f'{user_id}',
+                    'measurementId': 'MEASUREMENT#oldest'
                 }
             )
             logger.debug(f"Deleted oldest record (no measurements left) for user: {user_id}")
@@ -1023,8 +1023,8 @@ def recalculate_oldest_record_after_deletion(user_id: str, deleted_measurement_i
         # Oldest レコードを更新
         if oldest_values:
             oldest_record = {
-                'PK': f'{user_id}',
-                'SK': 'MEASUREMENT#oldest',
+                'userId': f'{user_id}',
+                'measurementId': 'MEASUREMENT#oldest',
                 'record_type': 'oldest',
                 **oldest_values,
                 **first_record_times,

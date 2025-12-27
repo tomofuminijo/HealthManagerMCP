@@ -401,10 +401,10 @@ class HealthmateHealthManagerStack(Stack):
             "BodyMeasurementsTable",
             table_name=f"healthmate-body-measurements{self.config_provider.get_environment_suffix()}",
             partition_key=dynamodb.Attribute(
-                name="PK", type=dynamodb.AttributeType.STRING
+                name="userId", type=dynamodb.AttributeType.STRING
             ),
             sort_key=dynamodb.Attribute(
-                name="SK", type=dynamodb.AttributeType.STRING
+                name="measurementId", type=dynamodb.AttributeType.STRING
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,  # 開発用：本番環境ではRETAINに変更
