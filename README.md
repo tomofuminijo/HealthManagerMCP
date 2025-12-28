@@ -59,6 +59,7 @@ graph TB
 - **活動記録管理**: 日々の健康活動の記録と履歴管理
 - **身体測定値管理**: 体重、身長、体脂肪率の記録と履歴管理
 - **日記管理**: 毎日の振り返りと気分スコアの記録
+- **健康経過観察管理**: 症状や治療の経過を継続的に追跡・記録 🆕
 
 ### AI連携機能
 - **MCP準拠API**: 標準化されたプロトコルによるAI連携
@@ -67,7 +68,7 @@ graph TB
 
 ## 🔧 MCPツール一覧
 
-Healthmate-HealthManagerは以下の**32個**のMCPツールを提供します：
+Healthmate-HealthManagerは以下の**40個**のMCPツールを提供します：
 
 ### UserManagement (3ツール)
 - `AddUser`: 新しいユーザー情報を作成
@@ -108,12 +109,22 @@ Healthmate-HealthManagerは以下の**32個**のMCPツールを提供します�
 - `GetOldestMeasurements`: 最古の測定値を取得
 - `GetMeasurementHistory`: 指定期間の測定履歴を取得
 
-### JournalManagement (5ツール) 🆕
+### JournalManagement (5ツール)
 - `AddJournal`: 新しい日記エントリーを作成または既存エントリーに追記
 - `GetJournal`: 指定した日付の日記エントリーを取得
 - `GetJournalsInRange`: 指定した日付範囲の日記エントリーを取得（最大365日間）
 - `UpdateJournal`: 既存の日記エントリーを完全置換
 - `DeleteJournal`: 日記エントリーを削除
+
+### HealthObservationManagement (8ツール) 🆕
+- `AddObservation`: 新しい健康経過観察記録を作成（例：「3日間腰痛の経過を観察しましょう」）
+- `GetObservation`: 指定された経過観察記録の詳細を取得
+- `GetObservationsInProgress`: 現在進行中の経過観察記録を取得
+- `GetObservationsInRange`: 指定期間内の経過観察記録を効率的に取得
+- `UpdateObservation`: 経過観察記録を差分更新（指定フィールドのみ更新）
+- `AddObservationProgress`: 経過観察の進捗ログを追加（日々の記録蓄積）
+- `CompleteObservation`: 経過観察を完了状態にする（結論記録必須）
+- `CancelObservation`: 経過観察をキャンセル状態にする（キャンセル理由記録必須）
 
 ## 🏛️ アーキテクチャ
 
@@ -184,7 +195,7 @@ cd ..
 # 単体テストを実行
 pytest tests/unit/ -v
 
-# 統合テストを実行（全32ツール）
+# 統合テストを実行（全40ツール）
 python test_mcp_client.py
 ```
 
@@ -215,7 +226,8 @@ Healthmate-HealthManager/
 │   ├── health_concern/handler.py # 健康悩み管理 Lambda
 │   ├── activity/handler.py      # 活動記録管理 Lambda
 │   ├── body_measurement/handler.py # 身体測定値管理 Lambda
-│   └── journal/handler.py       # 日記管理 Lambda 🆕
+│   ├── journal/handler.py       # 日記管理 Lambda
+│   └── health_observation/handler.py # 健康経過観察管理 Lambda 🆕
 ├── mcp-schema/                  # MCP ツールスキーマ定義
 │   ├── user-management-mcp-schema.json
 │   ├── health-goal-management-mcp-schema.json
@@ -223,7 +235,8 @@ Healthmate-HealthManager/
 │   ├── health-concern-management-mcp-schema.json
 │   ├── activity-management-mcp-schema.json
 │   ├── body-measurement-mcp-schema.json
-│   └── journal-management-mcp-schema.json 🆕
+│   ├── journal-management-mcp-schema.json
+│   └── health-observation-management-mcp-schema.json 🆕
 ├── scripts/                     # デプロイ・管理スクリプト
 │   ├── create-credential-provider.sh    # AgentCore Identity作成
 │   ├── delete-credential-provider.sh    # AgentCore Identity削除
@@ -235,11 +248,15 @@ Healthmate-HealthManager/
 ├── .kiro/specs/                 # 仕様書・設計書
 │   ├── m2m-authentication-refactor/
 │   ├── body-measurements/
-│   └── journal-management/      # 日記管理機能仕様 🆕
-│       ├── requirements.md      # 日記管理要件
-│       ├── design.md           # 日記管理設計
+│   ├── journal-management/      # 日記管理機能仕様
+│   │   ├── requirements.md      # 日記管理要件
+│   │   ├── design.md           # 日記管理設計
+│   │   └── tasks.md            # 実装タスク
+│   └── health-observation-management/ # 健康経過観察管理機能仕様 🆕
+│       ├── requirements.md      # 健康経過観察管理要件
+│       ├── design.md           # 健康経過観察管理設計
 │       └── tasks.md            # 実装タスク
-├── test_mcp_client.py          # 統合テストクライアント（全32ツール対応）
+├── test_mcp_client.py          # 統合テストクライアント（全40ツール対応）
 ├── requirements.txt            # Python 依存関係
 ├── pytest.ini                 # テスト設定
 └── README.md                   # このファイル
@@ -248,12 +265,13 @@ Healthmate-HealthManager/
 ## 📖 ドキュメント
 
 ### API仕様
-- **[MCPスキーマ](mcp-schema/)**: 全32個のMCPツールのAPI仕様（JSON Schema形式）
+- **[MCPスキーマ](mcp-schema/)**: 全40個のMCPツールのAPI仕様（JSON Schema形式）
 
 ### 機能仕様書
 - **[M2M認証](.kiro/specs/m2m-authentication-refactor/)**: M2M認証システムの要件・設計・実装
 - **[身体測定値管理](.kiro/specs/body-measurements/)**: 身体測定値記録機能の要件・設計・実装
-- **[日記管理](.kiro/specs/journal-management/)**: 日記管理機能の要件・設計・実装 🆕
+- **[日記管理](.kiro/specs/journal-management/)**: 日記管理機能の要件・設計・実装
+- **[健康経過観察管理](.kiro/specs/health-observation-management/)**: 健康経過観察管理機能の要件・設計・実装 🆕
 
 ### 日記管理機能の詳細
 
@@ -277,6 +295,44 @@ Healthmate-HealthManager/
   "tags": ["Coding", "Testing", "Happy", "Productive"],
   "createdAt": "2025-12-28T00:00:00Z",
   "updatedAt": "2025-12-28T12:00:00Z"
+}
+```
+
+### 健康経過観察管理機能の詳細 🆕
+
+健康経過観察管理機能は、CoachAIエージェントが「3日間腰痛の経過を観察しましょう」といった提案を行い、継続的な健康状態の追跡と記録を可能にする機能です：
+
+#### 主な特徴
+- **経過観察記録管理**: 症状や治療の経過を継続的に追跡・記録
+- **進捗ログ機能**: 日々の経過を詳細に記録し、蓄積
+- **優先度管理**: 1（低）から5（高）までの5段階優先度設定
+- **ステータス管理**: IN_PROGRESS、COMPLETED、CANCELLEDの状態管理
+- **効率的検索**: 進行中の観察記録や期間指定での履歴取得
+- **結論記録**: 完了時またはキャンセル時の結論・理由記録
+
+#### データ構造
+```json
+{
+  "userId": "user123",
+  "observationId": "OBS#2025-12-28-001",
+  "title": "腰痛と背中ストレッチの相関チェック",
+  "description": "毎日のストレッチで背中のストレッチをもう少し入念にやりましょう",
+  "priority": 3,
+  "status": "IN_PROGRESS",
+  "startDatetime": "2025-12-28T00:00:00Z",
+  "targetDatetime": "2025-12-30T00:00:00Z",
+  "frequency": "P1D",
+  "checkItems": ["ストレッチの実施状況", "腰痛の状況"],
+  "progressLogs": [
+    {
+      "date": "2025-12-28",
+      "note": "ストレッチ実施済み、ストレッチ直後に痛み緩和",
+      "recordedAt": "2025-12-28T12:31:00Z"
+    }
+  ],
+  "conclusion": null,
+  "createdAt": "2025-12-28T00:00:00Z",
+  "updatedAt": "2025-12-28T00:00:00Z"
 }
 ```
 
@@ -333,12 +389,13 @@ python test_mcp_client.py
 ```
 
 ### テストカバレッジ
-- **Lambda関数**: 全27ツールの完全テスト
-- **MCPスキーマ準拠**: 全ActivityType + BodyMeasurement + HealthConcern検証済み
+- **Lambda関数**: 全40ツールの完全テスト
+- **MCPスキーマ準拠**: 全ActivityType + BodyMeasurement + HealthConcern + HealthObservation検証済み
 - **認証フロー**: Cognito OAuth 2.0完全テスト
 - **CRUD操作**: 全データモデル検証済み
 - **身体測定値**: Latest/Oldest自動管理機能テスト済み
 - **健康悩み管理**: カテゴリ・ステータス・深刻度管理機能テスト済み
+- **健康経過観察管理**: 進行中記録の効率的取得、進捗ログ蓄積、状態管理機能テスト済み 🆕
 
 ## 🤝 AI クライアント連携
 
@@ -381,7 +438,8 @@ client = anthropic.Anthropic(
 | ✅ Phase 8 | 完了 | CDK統合リファクタリング（Gateway Targets統合） |
 | ✅ Phase 9 | 完了 | M2M認証リファクタリング（AgentCore専用認証） |
 | ✅ Phase 10 | 完了 | 身体測定値記録機能（Latest/Oldest自動管理） |
-| 🔄 Phase 11 | 進行中 | 本番環境への移行 |
+| ✅ Phase 11 | 完了 | 健康経過観察管理機能（進行中記録効率取得・進捗ログ蓄積） 🆕 |
+| 🔄 Phase 12 | 進行中 | 本番環境への移行 |
 
 ## 🤝 コントリビューション
 
