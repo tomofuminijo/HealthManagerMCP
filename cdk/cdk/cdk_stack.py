@@ -470,6 +470,33 @@ class HealthmateHealthManagerStack(Stack):
             ),
         )
 
+        # 健康経過観察テーブル
+        self.observations_table = dynamodb.Table(
+            self,
+            "ObservationsTable",
+            table_name=f"healthmate-observations{self.config_provider.get_environment_suffix()}",
+            partition_key=dynamodb.Attribute(
+                name="userId", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="observationId", type=dynamodb.AttributeType.STRING  # OBS#YYYY-MM-DD-XXX形式
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,  # 開発用：本番環境ではRETAINに変更
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True
+            ),
+        )
+
+        # LSI: InProgressIndex (進行中の経過観察記録用)
+        self.observations_table.add_local_secondary_index(
+            index_name="InProgressIndex",
+            sort_key=dynamodb.Attribute(
+                name="in_progress", type=dynamodb.AttributeType.STRING  # "TRUE"のみ存在（スパースインデックス）
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
         # BodyMeasurementLambda用のCloudWatch Logsロググループ
         body_measurement_log_group = logs.LogGroup(
             self,
@@ -560,6 +587,36 @@ class HealthmateHealthManagerStack(Stack):
         # JournalLambdaにDynamoDBテーブルへのアクセス権限を付与
         self.journals_table.grant_read_write_data(self.journal_lambda)
 
+        # HealthObservationLambda用のCloudWatch Logsロググループ
+        health_observation_log_group = logs.LogGroup(
+            self,
+            "HealthObservationLambdaLogGroup",
+            log_group_name=f"/aws/lambda/healthmanagermcp-health-observation{self.config_provider.get_environment_suffix()}",
+            retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
+            removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
+        )
+
+        # HealthObservationLambda関数
+        self.health_observation_lambda = lambda_.Function(
+            self,
+            "HealthObservationLambda",
+            function_name=f"healthmanagermcp-health-observation{self.config_provider.get_environment_suffix()}",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="health_observation.handler.lambda_handler",
+            code=lambda_.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            environment={
+                "OBSERVATIONS_TABLE_NAME": self.observations_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
+            },
+            log_group=health_observation_log_group,  # ロググループを明示的に指定
+        )
+
+        # HealthObservationLambdaにDynamoDBテーブルへのアクセス権限を付与
+        self.observations_table.grant_read_write_data(self.health_observation_lambda)
+
 
 
         # ========================================
@@ -597,6 +654,7 @@ class HealthmateHealthManagerStack(Stack):
                     self.body_measurement_lambda.function_arn,
                     self.health_concern_lambda.function_arn,
                     self.journal_lambda.function_arn,
+                    self.health_observation_lambda.function_arn,
                 ],
             )
         )
@@ -829,6 +887,32 @@ class HealthmateHealthManagerStack(Stack):
             )
         )
 
+        # HealthObservationManagement Target
+        health_observation_mcp_schema = load_mcp_schema("health-observation-management-mcp-schema.json")
+        
+        self.health_observation_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "HealthObservationManagementTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="HealthObservationManagement",
+            description="ユーザーの健康症状に対する経過観察を管理する",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.health_observation_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=health_observation_mcp_schema["tools"]
+                        )
+                    )
+                )
+            )
+        )
+
         # ========================================
         # Lambda Permissions
         # ========================================
@@ -872,6 +956,12 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         self.journal_lambda.add_permission(
+            "AllowAgentCoreGatewayInvoke",
+            principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            action="lambda:InvokeFunction",
+        )
+
+        self.health_observation_lambda.add_permission(
             "AllowAgentCoreGatewayInvoke",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
             action="lambda:InvokeFunction",
@@ -1016,6 +1106,14 @@ class HealthmateHealthManagerStack(Stack):
             export_name=f"Healthmate-HealthManager-JournalLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
+        CfnOutput(
+            self,
+            "HealthObservationLambdaArn",
+            value=self.health_observation_lambda.function_arn,
+            description="Health Observation Lambda Function ARN",
+            export_name=f"Healthmate-HealthManager-HealthObservationLambdaArn{self.config_provider.get_environment_suffix()}"
+        )
+
         # DynamoDBテーブル名
         CfnOutput(
             self,
@@ -1071,6 +1169,14 @@ class HealthmateHealthManagerStack(Stack):
             value=self.journals_table.table_name,
             description="Journals DynamoDB Table Name",
             export_name=f"Healthmate-HealthManager-JournalsTableName{self.config_provider.get_environment_suffix()}"
+        )
+
+        CfnOutput(
+            self,
+            "ObservationsTableName",
+            value=self.observations_table.table_name,
+            description="Observations DynamoDB Table Name",
+            export_name=f"Healthmate-HealthManager-ObservationsTableName{self.config_provider.get_environment_suffix()}"
         )
 
         # M2M認証用のJWKS URL

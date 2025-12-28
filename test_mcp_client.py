@@ -2068,7 +2068,379 @@ class HealthManagerMCPTestClient:
             print(f"❌ DeleteJournal例外: {str(e)}")
             success = False
         
-        print(f"\n🏁 全32ツールのテスト完了（JournalManagement 5ツール追加）")
+        print(f"\n🏁 全40ツールのテスト完了（HealthObservationManagement 8ツール追加）")
+        
+        # === HealthObservationManagement ツール (8個) ===
+        
+        test_observation_id = None
+        
+        # テスト35: HealthObservationManagement.AddObservation
+        print("\n--- 35. HealthObservationManagement.AddObservation テスト ---")
+        try:
+            start_datetime = "2025-12-28T00:00:00Z"
+            target_datetime = "2025-12-31T00:00:00Z"
+            
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthObservationManagement___AddObservation",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "title": "腰痛と背中ストレッチの相関チェック",
+                        "description": "毎日のストレッチで背中のストレッチをもう少し入念にやりましょう",
+                        "priority": 3,
+                        "startDatetime": start_datetime,
+                        "targetDatetime": target_datetime,
+                        "frequency": "P1D",
+                        "checkItems": ["ストレッチの実施状況", "腰痛の状況"]
+                    }
+                },
+                "id": 35
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ AddObservation失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ AddObservation成功")
+                    # observationIdを保存（後続のテストで使用）
+                    if 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'observationId' in parsed_content:
+                                        test_observation_id = parsed_content['observationId']
+                                        print(f"   保存されたobservationId: {test_observation_id}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ AddObservation失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ AddObservation例外: {str(e)}")
+            success = False
+        
+        # テスト36: HealthObservationManagement.GetObservation
+        print("\n--- 36. HealthObservationManagement.GetObservation テスト ---")
+        try:
+            if test_observation_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthObservationManagement___GetObservation",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "observationId": test_observation_id
+                        }
+                    },
+                    "id": 36
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ GetObservation失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ GetObservation成功")
+                else:
+                    print(f"❌ GetObservation失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ GetObservation スキップ: observationIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ GetObservation例外: {str(e)}")
+            success = False
+        
+        # テスト37: HealthObservationManagement.GetObservationsInProgress
+        print("\n--- 37. HealthObservationManagement.GetObservationsInProgress テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthObservationManagement___GetObservationsInProgress",
+                    "arguments": {
+                        "userId": self.user_id
+                    }
+                },
+                "id": 37
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetObservationsInProgress失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetObservationsInProgress成功")
+                    # observationIdを取得（AddObservationで取得できなかった場合）
+                    if not test_observation_id and 'result' in result and 'content' in result['result']:
+                        content = result['result']['content']
+                        if content and isinstance(content, list) and len(content) > 0:
+                            text_content = content[0].get('text', '')
+                            if text_content:
+                                try:
+                                    parsed_content = json.loads(text_content)
+                                    if 'observations' in parsed_content and parsed_content['observations']:
+                                        first_observation = parsed_content['observations'][0]
+                                        if 'observationId' in first_observation:
+                                            test_observation_id = first_observation['observationId']
+                                            print(f"   取得されたobservationId: {test_observation_id}")
+                                except json.JSONDecodeError:
+                                    pass
+            else:
+                print(f"❌ GetObservationsInProgress失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetObservationsInProgress例外: {str(e)}")
+            success = False
+        
+        # テスト38: HealthObservationManagement.AddObservationProgress
+        print("\n--- 38. HealthObservationManagement.AddObservationProgress テスト ---")
+        try:
+            if test_observation_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthObservationManagement___AddObservationProgress",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "observationId": test_observation_id,
+                            "date": today,
+                            "note": "ストレッチ実施済み、ストレッチ直後に痛み緩和"
+                        }
+                    },
+                    "id": 38
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ AddObservationProgress失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ AddObservationProgress成功")
+                else:
+                    print(f"❌ AddObservationProgress失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ AddObservationProgress スキップ: observationIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ AddObservationProgress例外: {str(e)}")
+            success = False
+        
+        # テスト39: HealthObservationManagement.UpdateObservation
+        print("\n--- 39. HealthObservationManagement.UpdateObservation テスト ---")
+        try:
+            if test_observation_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthObservationManagement___UpdateObservation",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "observationId": test_observation_id,
+                            "title": "更新された腰痛と背中ストレッチの相関チェック",
+                            "description": "毎日のストレッチで背中のストレッチをより入念に実施し、効果を観察",
+                            "priority": 4
+                        }
+                    },
+                    "id": 39
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ UpdateObservation失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ UpdateObservation成功")
+                else:
+                    print(f"❌ UpdateObservation失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ UpdateObservation スキップ: observationIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ UpdateObservation例外: {str(e)}")
+            success = False
+        
+        # テスト40: HealthObservationManagement.GetObservationsInRange
+        print("\n--- 40. HealthObservationManagement.GetObservationsInRange テスト ---")
+        try:
+            start_date = "2025-12-20"
+            end_date = "2025-12-31"
+            
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthObservationManagement___GetObservationsInRange",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "startDate": start_date,
+                        "endDate": end_date
+                    }
+                },
+                "id": 40
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetObservationsInRange失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetObservationsInRange成功")
+            else:
+                print(f"❌ GetObservationsInRange失敗: HTTP {response.status_code}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetObservationsInRange例外: {str(e)}")
+            success = False
+        
+        # テスト41: HealthObservationManagement.CompleteObservation
+        print("\n--- 41. HealthObservationManagement.CompleteObservation テスト ---")
+        try:
+            if test_observation_id:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthObservationManagement___CompleteObservation",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "observationId": test_observation_id,
+                            "conclusion": "ストレッチにより腰痛が大幅に改善されました。継続的な実施が効果的です。"
+                        }
+                    },
+                    "id": 41
+                }
+                
+                response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'error' in result:
+                        print(f"❌ CompleteObservation失敗: {result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ CompleteObservation成功")
+                else:
+                    print(f"❌ CompleteObservation失敗: HTTP {response.status_code}")
+                    success = False
+            else:
+                print("⚠️ CompleteObservation スキップ: observationIdが取得できませんでした")
+                
+        except Exception as e:
+            print(f"❌ CompleteObservation例外: {str(e)}")
+            success = False
+        
+        # テスト42: HealthObservationManagement.CancelObservation (新しい経過観察で実行)
+        print("\n--- 42. HealthObservationManagement.CancelObservation テスト ---")
+        try:
+            # キャンセルテスト用の新しい経過観察を作成
+            cancel_test_observation_id = None
+            
+            # 新しい経過観察を作成
+            add_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HealthObservationManagement___AddObservation",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "title": "キャンセルテスト用経過観察",
+                        "description": "キャンセル機能をテストするための経過観察",
+                        "priority": 2,
+                        "startDatetime": "2025-12-28T12:00:00Z",
+                        "targetDatetime": "2025-12-30T12:00:00Z",
+                        "frequency": "P1D",
+                        "checkItems": ["テスト項目"]
+                    }
+                },
+                "id": 42
+            }
+            
+            add_response = requests.post(mcp_endpoint, headers=headers, json=add_request, timeout=30)
+            
+            if add_response.status_code == 200:
+                add_result = add_response.json()
+                if 'result' in add_result and 'content' in add_result['result']:
+                    content = add_result['result']['content']
+                    if content and isinstance(content, list) and len(content) > 0:
+                        text_content = content[0].get('text', '')
+                        if text_content:
+                            try:
+                                parsed_content = json.loads(text_content)
+                                if 'observationId' in parsed_content:
+                                    cancel_test_observation_id = parsed_content['observationId']
+                            except json.JSONDecodeError:
+                                pass
+            
+            if cancel_test_observation_id:
+                # キャンセル実行
+                cancel_request = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "HealthObservationManagement___CancelObservation",
+                        "arguments": {
+                            "userId": self.user_id,
+                            "observationId": cancel_test_observation_id,
+                            "conclusion": "症状が急激に悪化したため医師に相談することにしました"
+                        }
+                    },
+                    "id": 42
+                }
+                
+                cancel_response = requests.post(mcp_endpoint, headers=headers, json=cancel_request, timeout=30)
+                
+                if cancel_response.status_code == 200:
+                    cancel_result = cancel_response.json()
+                    if 'error' in cancel_result:
+                        print(f"❌ CancelObservation失敗: {cancel_result['error']}")
+                        success = False
+                    else:
+                        print(f"✅ CancelObservation成功")
+                        print(f"   キャンセルされたobservationId: {cancel_test_observation_id}")
+                else:
+                    print(f"❌ CancelObservation失敗: HTTP {cancel_response.status_code}")
+                    success = False
+            else:
+                print("⚠️ CancelObservation スキップ: キャンセル用observationIdが作成できませんでした")
+                
+        except Exception as e:
+            print(f"❌ CancelObservation例外: {str(e)}")
+            success = False
+        
         return success
     
 

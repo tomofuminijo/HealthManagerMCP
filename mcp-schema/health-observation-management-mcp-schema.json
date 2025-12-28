@@ -1,0 +1,230 @@
+{
+  "tools": [
+    {
+      "name": "AddObservation",
+      "description": "新しい健康経過観察記録を作成します。CoachAIが「3日間腰痛の経過を観察しましょう」といった提案を行う際に使用します。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "title": {
+            "type": "string",
+            "description": "経過観察のタイトル（例：「腰痛と背中ストレッチの相関チェック」）"
+          },
+          "description": {
+            "type": "string",
+            "description": "経過観察の詳細説明（例：「毎日のストレッチで背中のストレッチをもう少し入念にやりましょう」）"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "優先度（1: 低 ～ 5: 高）"
+          },
+          "startDatetime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "経過観察開始日時（ISO 8601形式、例：2025-12-28T00:00:00Z）"
+          },
+          "targetDatetime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "経過観察目標日時（ISO 8601形式、例：2025-12-30T00:00:00Z）"
+          },
+          "frequency": {
+            "type": "string",
+            "description": "チェック頻度（ISO 8601 Duration形式、例：P1D（1日）、PT1H（1時間））"
+          },
+          "checkItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "チェック項目リスト（例：[\"ストレッチの実施状況\", \"腰痛の状況\"]）"
+          }
+        },
+        "required": ["userId", "title", "description", "priority", "startDatetime", "targetDatetime", "frequency", "checkItems"]
+      }
+    },
+    {
+      "name": "GetObservation",
+      "description": "指定された経過観察記録の詳細を取得します。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "observationId": {
+            "type": "string",
+            "description": "経過観察ID（例：OBS#2025-12-28-001）"
+          }
+        },
+        "required": ["userId", "observationId"]
+      }
+    },
+    {
+      "name": "GetObservationsInRange",
+      "description": "指定期間内の経過観察記録を効率的に取得します。過去の状況を把握するために利用します。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "開始日（YYYY-MM-DD形式、例：2025-12-01）"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "終了日（YYYY-MM-DD形式、例：2025-12-31）"
+          }
+        },
+        "required": ["userId", "startDate", "endDate"]
+      }
+    },
+    {
+      "name": "GetObservationsInProgress",
+      "description": "現在進行中の経過観察記録を取得します。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          }
+        },
+        "required": ["userId"]
+      }
+    },
+    {
+      "name": "UpdateObservation",
+      "description": "経過観察記録を差分更新します。指定したフィールドのみを更新し、全体置き換えは行いません。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "observationId": {
+            "type": "string",
+            "description": "経過観察ID（例：OBS#2025-12-28-001）"
+          },
+          "title": {
+            "type": "string",
+            "description": "経過観察のタイトル（オプション）"
+          },
+          "description": {
+            "type": "string",
+            "description": "経過観察の詳細説明（オプション）"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "優先度（1: 低 ～ 5: 高）（オプション）"
+          },
+          "targetDatetime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "経過観察目標日時（ISO 8601形式）（オプション）"
+          },
+          "frequency": {
+            "type": "string",
+            "description": "チェック頻度（ISO 8601 Duration形式）（オプション）"
+          },
+          "checkItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "チェック項目リスト（オプション）"
+          }
+        },
+        "required": ["userId", "observationId"]
+      }
+    },
+    {
+      "name": "AddObservationProgress",
+      "description": "経過観察の進捗ログを追加します。日々の記録を蓄積するために使用します。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "observationId": {
+            "type": "string",
+            "description": "経過観察ID（例：OBS#2025-12-28-001）"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "記録日（YYYY-MM-DD形式、例：2025-12-28）"
+          },
+          "note": {
+            "type": "string",
+            "description": "進捗メモ（例：「ストレッチ実施済み、ストレッチ直後に痛み緩和」）"
+          }
+        },
+        "required": ["userId", "observationId", "date", "note"]
+      }
+    },
+    {
+      "name": "CompleteObservation",
+      "description": "経過観察を完了状態にします。必ず結論を記録する必要があります。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "observationId": {
+            "type": "string",
+            "description": "経過観察ID（例：OBS#2025-12-28-001）"
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "経過観察の結論（例：「ストレッチにより腰痛が改善されました」）"
+          }
+        },
+        "required": ["userId", "observationId", "conclusion"]
+      }
+    },
+    {
+      "name": "CancelObservation",
+      "description": "経過観察をキャンセル状態にします。必ずキャンセル理由を記録する必要があります。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ユーザーID（JWTトークンから抽出）"
+          },
+          "observationId": {
+            "type": "string",
+            "description": "経過観察ID（例：OBS#2025-12-28-001）"
+          },
+          "conclusion": {
+            "type": "string",
+            "description": "キャンセル理由（例：「症状が急激に悪化したため医師に相談することにしました」）"
+          }
+        },
+        "required": ["userId", "observationId", "conclusion"]
+      }
+    }
+  ]
+}
