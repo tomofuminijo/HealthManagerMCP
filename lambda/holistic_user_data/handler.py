@@ -355,9 +355,10 @@ def get_active_goals(user_id: str) -> List[Dict[str, Any]]:
     try:
         logger.debug(f"Retrieving active goals for: {user_id}")
         
+        # userIdをパーティションキーとしてクエリし、statusでフィルタリング
         response = goals_table.query(
             KeyConditionExpression=Key('userId').eq(user_id),
-            FilterExpression=Attr('status').eq('Active')
+            FilterExpression=Attr('status').eq('active')
         )
         
         goals = response.get('Items', [])
@@ -419,9 +420,10 @@ def get_active_concerns(user_id: str) -> List[Dict[str, Any]]:
     try:
         logger.debug(f"Retrieving active concerns for: {user_id}")
         
+        # userIdをパーティションキーとしてクエリし、statusでフィルタリング
         response = concerns_table.query(
             KeyConditionExpression=Key('userId').eq(user_id),
-            FilterExpression=Attr('status').eq('Active')
+            FilterExpression=Attr('status').is_in(['ACTIVE', 'IMPROVED'])
         )
         
         concerns = response.get('Items', [])
@@ -452,7 +454,7 @@ def get_body_measurements(user_id: str, date_ranges: Dict[str, str]) -> Dict[str
     try:
         logger.debug(f"Retrieving body measurements for: {user_id}")
         
-        # 最新レコード取得
+        # 最新レコード取得（LSIを使用）
         latest_measurement = None
         try:
             latest_response = body_measurements_table.query(
@@ -466,7 +468,7 @@ def get_body_measurements(user_id: str, date_ranges: Dict[str, str]) -> Dict[str
         except ClientError as e:
             logger.warning(f"Error retrieving latest measurement: {str(e)}")
         
-        # 最古レコード取得
+        # 最古レコード取得（LSIを使用）
         oldest_measurement = None
         try:
             oldest_response = body_measurements_table.query(
@@ -480,12 +482,20 @@ def get_body_measurements(user_id: str, date_ranges: Dict[str, str]) -> Dict[str
         except ClientError as e:
             logger.warning(f"Error retrieving oldest measurement: {str(e)}")
         
-        # 直近3日分のデータ取得
+        # 直近3日分のデータ取得（通常のクエリ + フィルタ）
         recent_measurements = []
         try:
+            # 直近3日間の開始日と終了日を計算
+            start_date = date_ranges["start_date"]  # 3日前
+            end_date = date_ranges["end_date"]      # 今日
+            
+            # ソートキーの範囲を指定
+            start_sk = f"MEASUREMENT#{start_date}"
+            end_sk = f"MEASUREMENT#{end_date}Z"  # Zを付けてその日の最後まで含める
+            
             recent_response = body_measurements_table.query(
-                KeyConditionExpression=Key('userId').eq(user_id),
-                FilterExpression=Attr('date').between(date_ranges["start_date"], date_ranges["end_date"])
+                KeyConditionExpression=Key('userId').eq(user_id) & 
+                                     Key('measurementId').between(start_sk, end_sk)
             )
             recent_measurements = recent_response.get('Items', [])
             logger.debug(f"Found {len(recent_measurements)} recent measurements for user: {user_id}")
@@ -521,6 +531,7 @@ def get_recent_activities(user_id: str, date_ranges: Dict[str, str]) -> Dict[str
     try:
         logger.debug(f"Retrieving recent activities for: {user_id}")
         
+        # userIdをパーティションキーとし、dateをソートキーとして範囲クエリ
         response = activities_table.query(
             KeyConditionExpression=Key('userId').eq(user_id) & Key('date').between(
                 date_ranges["start_date"], 
@@ -570,6 +581,7 @@ def get_in_progress_observations(user_id: str) -> Dict[str, Any]:
     try:
         logger.debug(f"Retrieving in-progress observations for: {user_id}")
         
+        # LSIを使用して進行中の観測を取得
         response = observations_table.query(
             IndexName='InProgressIndex',
             KeyConditionExpression=Key('userId').eq(user_id) & Key('in_progress').eq('TRUE')
