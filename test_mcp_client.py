@@ -7,7 +7,7 @@ HealthManagerMCP テスト用MCPクライアント（M2M認証版）
 
 1. Cognito User PoolからClient Credentials Flowでアクセストークンを取得
 2. AgentCore GatewayにM2M認証でMCP接続
-3. 各Gateway Targetの動作確認（全23ツール）
+3. 各Gateway Targetの動作確認（全33ツール）
 
 テスト対象ツール:
 - UserManagement (3ツール): AddUser, UpdateUser, GetUser
@@ -17,6 +17,8 @@ HealthManagerMCP テスト用MCPクライアント（M2M認証版）
 - BodyMeasurementManagement (6ツール): AddBodyMeasurement, UpdateBodyMeasurement, DeleteBodyMeasurement, GetLatestMeasurements, GetOldestMeasurements, GetMeasurementHistory
 - HealthConcernManagement (4ツール): AddConcern, UpdateConcern, DeleteConcern, GetConcerns
 - JournalManagement (5ツール): AddJournal, GetJournal, GetJournalsInRange, UpdateJournal, DeleteJournal
+- HealthObservationManagement (6ツール): AddObservation, UpdateObservation, DeleteObservation, GetObservations, CompleteObservation, CancelObservation
+- HolisticUserDataService (1ツール): GetUserHolisticData
 
 環境設定:
     HEALTHMATE_ENV環境変数で環境を指定（dev/stage/prod、デフォルト: dev）
@@ -276,8 +278,8 @@ class HealthManagerMCPTestClient:
             return False
     
     def test_mcp_tools(self) -> bool:
-        """実際のMCPツールを呼び出してテスト（全32ツール）"""
-        print("🧪 MCP ツール呼び出しテスト中（全32ツール）...")
+        """実際のMCPツールを呼び出してテスト（全33ツール）"""
+        print("🧪 MCP ツール呼び出しテスト中（全33ツール）...")
         
         if not self.gateway_endpoint or not self.access_token:
             print("❌ Gateway EndpointまたはAccess Tokenが設定されていません")
@@ -2440,13 +2442,139 @@ class HealthManagerMCPTestClient:
         except Exception as e:
             print(f"❌ CancelObservation例外: {str(e)}")
             success = False
+
+        # === HolisticUserDataService ツール (1個) ===
+        
+        # テスト33: HolisticUserDataService.GetUserHolisticData
+        print("\n--- 33. HolisticUserDataService.GetUserHolisticData テスト ---")
+        try:
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {
+                    "name": "HolisticUserDataService___GetUserHolisticData",
+                    "arguments": {
+                        "userId": self.user_id,
+                        "timezone": "Asia/Tokyo"
+                    }
+                },
+                "id": 33
+            }
+            
+            response = requests.post(mcp_endpoint, headers=headers, json=mcp_request, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'error' in result:
+                    print(f"❌ GetUserHolisticData失敗: {result['error']}")
+                    success = False
+                else:
+                    print(f"✅ GetUserHolisticData成功")
+                    
+                    # レスポンス構造の検証
+                    if 'result' in result and 'content' in result['result']:
+                        try:
+                            content_data = result['result']['content']
+                            
+                            # contentが既にdict/listの場合とstring（JSON）の場合を処理
+                            if isinstance(content_data, str):
+                                content = json.loads(content_data)
+                            elif isinstance(content_data, list):
+                                # リスト形式のレスポンスを処理
+                                if len(content_data) > 0 and 'text' in content_data[0]:
+                                    # textフィールドがある場合、JSONとして解析を試行
+                                    try:
+                                        text_content = content_data[0]['text']
+                                        parsed_content = json.loads(text_content)
+                                        if isinstance(parsed_content, dict) and parsed_content.get('success'):
+                                            content = parsed_content
+                                        else:
+                                            print(f"❌ Lambda関数エラー: {text_content}")
+                                            success = False
+                                            return success
+                                    except json.JSONDecodeError:
+                                        print(f"❌ Lambda関数エラー: {content_data[0]['text']}")
+                                        success = False
+                                        return success
+                                else:
+                                    content = content_data
+                            else:
+                                content = content_data
+                            
+                            if isinstance(content, dict) and content.get('success') and 'data' in content:
+                                data = content['data']
+                                
+                                # 必須セクションの存在確認
+                                required_sections = [
+                                    'metadata', 'userProfile', 'goals', 'policies', 
+                                    'concerns', 'bodyMeasurements', 'activities', 
+                                    'observations', 'reflection'
+                                ]
+                                
+                                missing_sections = []
+                                for section in required_sections:
+                                    if section not in data:
+                                        missing_sections.append(section)
+                                
+                                if missing_sections:
+                                    print(f"⚠️ 不足しているセクション: {missing_sections}")
+                                else:
+                                    print(f"✅ 全ての必須セクションが含まれています")
+                                    
+                                # メタデータの確認
+                                if 'metadata' in data:
+                                    metadata = data['metadata']
+                                    print(f"   ユーザーID: {metadata.get('userId')}")
+                                    print(f"   取得時刻: {metadata.get('retrievedAt')}")
+                                
+                                # データ数の表示
+                                print(f"   健康目標数: {len(data.get('goals', []))}")
+                                print(f"   健康ポリシー数: {len(data.get('policies', []))}")
+                                print(f"   健康コンサーン数: {len(data.get('concerns', []))}")
+                                
+                                # 身体測定データの確認
+                                body_measurements = data.get('bodyMeasurements', {})
+                                print(f"   最新測定: {'あり' if body_measurements.get('latest') else 'なし'}")
+                                print(f"   最古測定: {'あり' if body_measurements.get('oldest') else 'なし'}")
+                                print(f"   直近3日測定数: {len(body_measurements.get('recent3Days', []))}")
+                                
+                                # 活動履歴の確認
+                                activities = data.get('activities', {})
+                                recent_activities = activities.get('recent3Days', [])
+                                print(f"   直近3日活動記録数: {len(recent_activities)}")
+                                
+                                # 経過観測の確認
+                                observations = data.get('observations', {})
+                                in_progress = observations.get('inProgress', [])
+                                print(f"   進行中観測数: {len(in_progress)}")
+                                
+                                # 前日日記の確認
+                                reflection = data.get('reflection', {})
+                                previous_day = reflection.get('previousDay')
+                                print(f"   前日日記: {'あり' if previous_day else 'なし'}")
+                                
+                            else:
+                                print(f"⚠️ レスポンス形式が不正: success={content.get('success')}")
+                        except json.JSONDecodeError as e:
+                            print(f"⚠️ JSONパース失敗: {str(e)}")
+                    else:
+                        print(f"⚠️ 予期しないレスポンス形式")
+            else:
+                print(f"❌ GetUserHolisticData失敗: HTTP {response.status_code}")
+                if response.text:
+                    print(f"   エラー詳細: {response.text}")
+                success = False
+                
+        except Exception as e:
+            print(f"❌ GetUserHolisticData例外: {str(e)}")
+            success = False
         
         return success
     
 
     def run_tests(self) -> bool:
         """全テストを実行（M2M認証版）"""
-        print("🚀 HealthManagerMCP M2M認証テスト開始（全32ツール）")
+        print("🚀 HealthManagerMCP M2M認証テスト開始（全33ツール）")
         print(f"🌍 Environment: {ENVIRONMENT}")
         print(f"📦 Stack Name: {STACK_NAME}")
         print("=" * 60)
@@ -2461,13 +2589,13 @@ class HealthManagerMCPTestClient:
         if not self.test_mcp_connection():
             success = False
         
-        # 3. MCPツール呼び出しテスト（全32ツール）
+        # 3. MCPツール呼び出しテスト（全33ツール）
         if not self.test_mcp_tools():
             success = False
         
         print("=" * 60)
         if success:
-            print("✅ 全M2M認証テスト完了（32ツール全て成功）")
+            print("✅ 全M2M認証テスト完了（33ツール全て成功）")
         else:
             print("⚠️  一部テストで問題が発生しました")
         

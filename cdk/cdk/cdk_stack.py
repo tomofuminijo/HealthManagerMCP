@@ -617,7 +617,49 @@ class HealthmateHealthManagerStack(Stack):
         # HealthObservationLambdaにDynamoDBテーブルへのアクセス権限を付与
         self.observations_table.grant_read_write_data(self.health_observation_lambda)
 
+        # HolisticUserDataLambda用のCloudWatch Logsロググループ
+        holistic_user_data_log_group = logs.LogGroup(
+            self,
+            "HolisticUserDataLambdaLogGroup",
+            log_group_name=f"/aws/lambda/healthmanagermcp-holistic-user-data{self.config_provider.get_environment_suffix()}",
+            retention=logs.RetentionDays.ONE_WEEK,  # 1週間保持
+            removal_policy=RemovalPolicy.DESTROY,  # スタック削除時に削除
+        )
 
+        # HolisticUserDataLambda関数
+        self.holistic_user_data_lambda = lambda_.Function(
+            self,
+            "HolisticUserDataLambda",
+            function_name=f"healthmanagermcp-holistic-user-data{self.config_provider.get_environment_suffix()}",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="holistic_user_data.handler.lambda_handler",
+            code=lambda_.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(60),  # 複数テーブルアクセスのため長めに設定
+            memory_size=512,  # データ処理のため多めに設定
+            environment={
+                "USERS_TABLE_NAME": self.users_table.table_name,
+                "GOALS_TABLE_NAME": self.goals_table.table_name,
+                "POLICIES_TABLE_NAME": self.policies_table.table_name,
+                "CONCERNS_TABLE_NAME": self.concerns_table.table_name,
+                "BODY_MEASUREMENTS_TABLE_NAME": self.body_measurements_table.table_name,
+                "ACTIVITIES_TABLE_NAME": self.activities_table.table_name,
+                "OBSERVATIONS_TABLE_NAME": self.observations_table.table_name,
+                "JOURNALS_TABLE_NAME": self.journals_table.table_name,
+                "HEALTHMATE_ENV": self.current_environment,
+                "LOG_LEVEL": self.log_controller.get_log_level(),
+            },
+            log_group=holistic_user_data_log_group,  # ロググループを明示的に指定
+        )
+
+        # HolisticUserDataLambdaに全テーブルへの読み取り権限を付与
+        self.users_table.grant_read_data(self.holistic_user_data_lambda)
+        self.goals_table.grant_read_data(self.holistic_user_data_lambda)
+        self.policies_table.grant_read_data(self.holistic_user_data_lambda)
+        self.concerns_table.grant_read_data(self.holistic_user_data_lambda)
+        self.body_measurements_table.grant_read_data(self.holistic_user_data_lambda)
+        self.activities_table.grant_read_data(self.holistic_user_data_lambda)
+        self.observations_table.grant_read_data(self.holistic_user_data_lambda)
+        self.journals_table.grant_read_data(self.holistic_user_data_lambda)
 
         # ========================================
         # Bedrock AgentCore Gateway
@@ -655,6 +697,7 @@ class HealthmateHealthManagerStack(Stack):
                     self.health_concern_lambda.function_arn,
                     self.journal_lambda.function_arn,
                     self.health_observation_lambda.function_arn,
+                    self.holistic_user_data_lambda.function_arn,
                 ],
             )
         )
@@ -913,6 +956,32 @@ class HealthmateHealthManagerStack(Stack):
             )
         )
 
+        # HolisticUserDataService Target
+        holistic_user_data_mcp_schema = load_mcp_schema("holistic-user-data-service-mcp-schema.json")
+        
+        self.holistic_user_data_target = bedrockagentcore.CfnGatewayTarget(
+            self,
+            "HolisticUserDataServiceTarget",
+            gateway_identifier=self.agentcore_gateway.ref,
+            name="HolisticUserDataService",
+            description="ユーザーの包括的健康データを一括取得するサービス",
+            credential_provider_configurations=[
+                bedrockagentcore.CfnGatewayTarget.CredentialProviderConfigurationProperty(
+                    credential_provider_type="GATEWAY_IAM_ROLE"
+                )
+            ],
+            target_configuration=bedrockagentcore.CfnGatewayTarget.TargetConfigurationProperty(
+                mcp=bedrockagentcore.CfnGatewayTarget.McpTargetConfigurationProperty(
+                    lambda_=bedrockagentcore.CfnGatewayTarget.McpLambdaTargetConfigurationProperty(
+                        lambda_arn=self.holistic_user_data_lambda.function_arn,
+                        tool_schema=bedrockagentcore.CfnGatewayTarget.ToolSchemaProperty(
+                            inline_payload=holistic_user_data_mcp_schema
+                        )
+                    )
+                )
+            )
+        )
+
         # ========================================
         # Lambda Permissions
         # ========================================
@@ -962,6 +1031,12 @@ class HealthmateHealthManagerStack(Stack):
         )
 
         self.health_observation_lambda.add_permission(
+            "AllowAgentCoreGatewayInvoke",
+            principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            action="lambda:InvokeFunction",
+        )
+
+        self.holistic_user_data_lambda.add_permission(
             "AllowAgentCoreGatewayInvoke",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
             action="lambda:InvokeFunction",
@@ -1112,6 +1187,14 @@ class HealthmateHealthManagerStack(Stack):
             value=self.health_observation_lambda.function_arn,
             description="Health Observation Lambda Function ARN",
             export_name=f"Healthmate-HealthManager-HealthObservationLambdaArn{self.config_provider.get_environment_suffix()}"
+        )
+
+        CfnOutput(
+            self,
+            "HolisticUserDataLambdaArn",
+            value=self.holistic_user_data_lambda.function_arn,
+            description="Holistic User Data Lambda Function ARN",
+            export_name=f"Healthmate-HealthManager-HolisticUserDataLambdaArn{self.config_provider.get_environment_suffix()}"
         )
 
         # DynamoDBテーブル名

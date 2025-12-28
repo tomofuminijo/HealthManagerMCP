@@ -1,0 +1,21 @@
+[
+  {
+    "name": "GetUserHolisticData",
+    "description": "ユーザーの包括的な健康データを一括で取得する。ユーザー情報、健康目標、ポリシー、悩み、身体測定（最新・最古・直近3日）、活動履歴（直近3日）、進行中の経過観測、前日の振り返り日記を含む。AI健康コーチが効果的なアドバイスを提供するために必要な、ユーザーの最新の健康状態を包括的に把握することを目的としている。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ユーザーID（Cognito User ID）"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "ユーザーのタイムゾーン（デフォルト: Asia/Tokyo）。日付計算（今日、前日、直近3日間）に使用される。",
+          "default": "Asia/Tokyo"
+        }
+      },
+      "required": ["userId"]
+    }
+  }
+]
