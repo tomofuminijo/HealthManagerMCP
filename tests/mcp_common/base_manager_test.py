@@ -8,7 +8,7 @@ Manager テストの基底クラス
 import time
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from .mcp_client import MCPClient
 from .test_utils import TestUtils, TestResult
 
@@ -398,8 +398,9 @@ class BaseManagerTest(ABC):
         elif "concernId" in cleanup_tool.lower():
             delete_params["concernId"] = id_info["id"]
         elif "journalId" in cleanup_tool.lower():
-            # JournalManagementは日付ベースの削除
-            delete_params["date"] = datetime.now().strftime("%Y-%m-%d")
+            # JournalManagementは日付ベースの削除（前日の日付を使用）
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            delete_params["date"] = yesterday
         elif "observationId" in cleanup_tool.lower():
             delete_params["observationId"] = id_info["id"]
         

@@ -409,10 +409,10 @@ class AllManagersTest:
             'data_counts': {}
         }
         
-        # 期待されるセクション
+        # 期待されるセクション（実際のHolisticUserDataServiceのレスポンス構造に合わせる）
         expected_sections = [
             'userProfile', 'goals', 'policies', 'activities', 
-            'bodyMeasurements', 'concerns', 'journals', 'observations'
+            'bodyMeasurements', 'concerns', 'reflection', 'observations'
         ]
         
         for section in expected_sections:
@@ -427,6 +427,9 @@ class AllManagersTest:
                 elif isinstance(section_data, dict):
                     if section == 'userProfile':
                         validation['data_counts'][section] = 1 if section_data else 0
+                    elif section == 'reflection':
+                        # reflectionセクションは前日の日記があるかどうかで判定
+                        validation['data_counts'][section] = 1 if section_data.get('previousDay') else 0
                     else:
                         validation['data_counts'][section] = len(section_data)
                 else:
@@ -456,7 +459,7 @@ class AllManagersTest:
             else:
                 return {'valid': False, 'reason': 'User profile is empty or invalid format'}
         
-        elif section in ['goals', 'policies', 'activities', 'concerns', 'journals', 'observations']:
+        elif section in ['goals', 'policies', 'activities', 'concerns', 'observations']:
             if isinstance(data, list):
                 return {
                     'valid': True,
@@ -465,6 +468,17 @@ class AllManagersTest:
                 }
             else:
                 return {'valid': False, 'reason': f'{section} is not a list'}
+        
+        elif section == 'reflection':
+            if isinstance(data, dict):
+                # reflectionは辞書形式で前日の日記データを含む
+                has_previous_day = 'previousDay' in data
+                return {
+                    'valid': has_previous_day,
+                    'details': f"Previous day reflection: {'found' if has_previous_day else 'not found'}"
+                }
+            else:
+                return {'valid': False, 'reason': 'Reflection is not a dict'}
         
         elif section == 'bodyMeasurements':
             if isinstance(data, dict):

@@ -41,10 +41,12 @@ class JournalManagementTest(BaseManagerTest):
     
     def get_required_test_data(self) -> Dict[str, Any]:
         """テスト用の日記データを生成"""
+        # HolisticUserDataServiceは前日の日記のみを取得するため、前日の日付を使用
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         return {
             "journal_data": {
-                "date": datetime.now().strftime("%Y-%m-%d"),  # 必須フィールド
-                "content": "今日は早起きして、朝のジョギングを30分行った。朝食は野菜たっぷりのサラダとヨーグルト。",
+                "date": yesterday,  # 前日の日付を使用
+                "content": "昨日は早起きして、朝のジョギングを30分行った。朝食は野菜たっぷりのサラダとヨーグルト。",
                 "moodScore": 4,
                 "tags": ["Exercise", "Healthy", "Morning", "Productive"]  # PascalCase英語形式
             }
@@ -68,11 +70,10 @@ class JournalManagementTest(BaseManagerTest):
             if TestUtils.validate_response_success(response):
                 print("✅ 日記エントリ追加成功")
                 
-                # JournalManagementは日付ベースなのでjournalIdではなく日付を記録
+                # JournalManagementは日付ベースなので日付を記録
                 date = journal_data.get("date")
                 if date:
-                    self.created_ids.append(("journal", date))
-                    print(f"📝 作成日付記録: {date} (JournalManagement___AddJournal)")
+                    self.record_created_id(date, "JournalManagement___AddJournal")
                     return True
                 else:
                     print("⚠️ 日付が見つかりません")
@@ -90,9 +91,12 @@ class JournalManagementTest(BaseManagerTest):
         """JournalManagement___GetJournal ツールのテスト"""
         print("📝 日記エントリ取得テスト開始...")
         
+        # 前日の日付を使用（HolisticUserDataServiceとの整合性のため）
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
         arguments = {
             "userId": self.test_user_id,
-            "date": datetime.now().strftime("%Y-%m-%d")  # 必須フィールド
+            "date": yesterday  # 前日の日付を使用
         }
         
         try:
@@ -146,9 +150,12 @@ class JournalManagementTest(BaseManagerTest):
         """JournalManagement___UpdateJournal ツールのテスト"""
         print("📝 日記エントリ更新テスト開始...")
         
+        # 前日の日付を使用（HolisticUserDataServiceとの整合性のため）
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
         arguments = {
             "userId": self.test_user_id,
-            "date": datetime.now().strftime("%Y-%m-%d"),  # 必須フィールド
+            "date": yesterday,  # 前日の日付を使用
             "content": "健康的な一日（更新版）- 夕方にもウォーキングを追加した。",
             "moodScore": 5
         }
@@ -172,9 +179,12 @@ class JournalManagementTest(BaseManagerTest):
         """JournalManagement___DeleteJournal ツールのテスト"""
         print("📝 日記エントリ削除テスト開始...")
         
+        # 前日の日付を使用（HolisticUserDataServiceとの整合性のため）
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
         arguments = {
             "userId": self.test_user_id,
-            "date": datetime.now().strftime("%Y-%m-%d")  # 必須フィールド
+            "date": yesterday  # 前日の日付を使用
         }
         
         try:

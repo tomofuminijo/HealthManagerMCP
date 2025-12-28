@@ -185,19 +185,7 @@ def get_user_holistic_data(parameters: Dict[str, Any]) -> Dict[str, Any]:
     body_measurements = get_body_measurements(user_id, date_ranges)
     activities = get_recent_activities(user_id, date_ranges)
     observations = get_in_progress_observations(user_id)
-    reflection = get_previous_day_reflection(user_id, date_ranges["previous_day"])
-    
-    # データ新鮮度情報を構築
-    data_freshness = {
-        "userProfile": retrieved_at,
-        "goals": retrieved_at,
-        "policies": retrieved_at,
-        "concerns": retrieved_at,
-        "bodyMeasurements": retrieved_at,
-        "activities": retrieved_at,
-        "observations": retrieved_at,
-        "reflection": retrieved_at
-    }
+    journals = get_previous_day_journal(user_id, date_ranges["previous_day"])
     
     # レスポンス構造を構築
     response = {
@@ -205,8 +193,7 @@ def get_user_holistic_data(parameters: Dict[str, Any]) -> Dict[str, Any]:
         "data": {
             "metadata": {
                 "userId": user_id,
-                "retrievedAt": retrieved_at,
-                "dataFreshness": data_freshness
+                "retrievedAt": retrieved_at
             },
             "userProfile": user_profile,
             "goals": goals,
@@ -215,7 +202,7 @@ def get_user_holistic_data(parameters: Dict[str, Any]) -> Dict[str, Any]:
             "bodyMeasurements": body_measurements,
             "activities": activities,
             "observations": observations,
-            "reflection": reflection
+            "journals": journals
         }
     }
     
@@ -600,7 +587,7 @@ def get_in_progress_observations(user_id: str) -> Dict[str, Any]:
         raise
 
 
-def get_previous_day_reflection(user_id: str, previous_date: str) -> Dict[str, Any]:
+def get_previous_day_journal(user_id: str, previous_date: str) -> Dict[str, Any]:
     """
     前日の振り返り日記取得
     
@@ -615,7 +602,7 @@ def get_previous_day_reflection(user_id: str, previous_date: str) -> Dict[str, A
         ClientError: DynamoDB操作でエラーが発生した場合
     """
     try:
-        logger.debug(f"Retrieving previous day reflection for: {user_id}, date: {previous_date}")
+        logger.debug(f"Retrieving previous day journal for: {user_id}, date: {previous_date}")
         
         response = journals_table.get_item(
             Key={"userId": user_id, "date": previous_date}
@@ -623,18 +610,18 @@ def get_previous_day_reflection(user_id: str, previous_date: str) -> Dict[str, A
         
         if "Item" in response:
             journal = response["Item"]
-            logger.debug(f"Found previous day reflection for user: {user_id}")
+            logger.debug(f"Found previous day journal for user: {user_id}")
             
             return {
                 "previousDay": journal
             }
         else:
-            logger.debug(f"No previous day reflection found for user: {user_id}")
+            logger.debug(f"No previous day journal found for user: {user_id}")
             return {
                 "previousDay": None
             }
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        logger.error(f"DynamoDB error in get_previous_day_reflection: {error_code} - {str(e)}")
+        logger.error(f"DynamoDB error in get_previous_day_journal: {error_code} - {str(e)}")
         raise
