@@ -412,7 +412,7 @@ class AllManagersTest:
         # 期待されるセクション（実際のHolisticUserDataServiceのレスポンス構造に合わせる）
         expected_sections = [
             'userProfile', 'goals', 'policies', 'activities', 
-            'bodyMeasurements', 'concerns', 'reflection', 'observations'
+            'bodyMeasurements', 'concerns', 'journals', 'observations'
         ]
         
         for section in expected_sections:
@@ -427,8 +427,8 @@ class AllManagersTest:
                 elif isinstance(section_data, dict):
                     if section == 'userProfile':
                         validation['data_counts'][section] = 1 if section_data else 0
-                    elif section == 'reflection':
-                        # reflectionセクションは前日の日記があるかどうかで判定
+                    elif section == 'journals':
+                        # journalsセクションは前日の日記があるかどうかで判定
                         validation['data_counts'][section] = 1 if section_data.get('previousDay') else 0
                     else:
                         validation['data_counts'][section] = len(section_data)
@@ -469,16 +469,16 @@ class AllManagersTest:
             else:
                 return {'valid': False, 'reason': f'{section} is not a list'}
         
-        elif section == 'reflection':
+        elif section == 'journals':
             if isinstance(data, dict):
-                # reflectionは辞書形式で前日の日記データを含む
+                # journalsは辞書形式で前日の日記データを含む
                 has_previous_day = 'previousDay' in data
                 return {
                     'valid': has_previous_day,
-                    'details': f"Previous day reflection: {'found' if has_previous_day else 'not found'}"
+                    'details': f"Previous day journal: {'found' if has_previous_day else 'not found'}"
                 }
             else:
-                return {'valid': False, 'reason': 'Reflection is not a dict'}
+                return {'valid': False, 'reason': 'journal is not a dict'}
         
         elif section == 'bodyMeasurements':
             if isinstance(data, dict):
